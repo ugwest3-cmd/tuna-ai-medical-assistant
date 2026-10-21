@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tuna AI - Uganda Clinical Guidelines Admin Portal</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <style>
+    body { background-color: #0b0f19; color: #cbd5e1; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    .glass-card { background: rgba(17, 24, 39, 0.85); backdrop-filter: blur(12px); border: 1px solid rgba(55, 65, 81, 0.6); }
+    .btn-emerald { background: linear-gradient(135deg, #10b981 0%, #059669 100%); transition: all 0.2s ease; }
+    .btn-emerald:hover { filter: brightness(1.1); transform: translateY(-1px); }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+  <!-- Top Navigation -->
+  <header class="border-b border-gray-800 bg-gray-900/90 sticky top-0 z-50 px-6 py-4 flex items-center justify-between">
+    <div class="flex items-center space-x-3">
+      <div class="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-xl border border-emerald-500/40">
+        🩺
+      </div>
+      <div>
+        <h1 class="text-lg font-bold text-white flex items-center gap-2">
+          Tuna AI <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800">Uganda 🇺🇬</span>
+        </h1>
+        <p class="text-xs text-gray-400">Clinical Guidelines & Diagnostic Intelligence Admin Portal</p>
+      </div>
+    </div>
+    <div class="flex items-center space-x-4">
+      <div class="text-right hidden sm:block">
+        <span class="text-xs text-gray-500 block">AI Infrastructure</span>
+        <span class="text-xs font-semibold text-emerald-400 flex items-center gap-1">
+          <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Groq Cloud + Supabase
+        </span>
+      </div>
+      <span class="px-2.5 py-1 rounded-md text-xs font-medium bg-gray-800 text-gray-300 border border-gray-700">
+        <i class="fa-solid fa-cloud text-blue-400 mr-1"></i> Vercel Serverless
+      </span>
+    </div>
+  </header>
+
+  <main class="flex-1 max-w-7xl w-full mx-auto p-6 space-y-6">
+
+    <!-- KPI Metric Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div class="glass-card rounded-xl p-5">
+        <div class="text-gray-400 text-xs font-semibold uppercase tracking-wider">Clinical Framework</div>
+        <div class="text-xl font-bold text-white mt-1">Uganda Clinical Guidelines</div>
+        <div class="text-xs text-emerald-400 mt-2 flex items-center gap-1">
+          <i class="fa-solid fa-check-double"></i> Zero Page Citations Strict Mode
+        </div>
+      </div>
+      <div class="glass-card rounded-xl p-5">
+        <div class="text-gray-400 text-xs font-semibold uppercase tracking-wider">pgvector Chunks</div>
+        <div class="text-2xl font-bold text-emerald-400 mt-1" id="statChunks">--</div>
+        <div class="text-xs text-gray-500 mt-2">Supabase (1024 dims)</div>
+      </div>
+      <div class="glass-card rounded-xl p-5">
+        <div class="text-gray-400 text-xs font-semibold uppercase tracking-wider">Health Workers</div>
+        <div class="text-2xl font-bold text-white mt-1" id="statUsers">--</div>
+        <div class="text-xs text-gray-500 mt-2">Registered WhatsApp Users</div>
+      </div>
+      <div class="glass-card rounded-xl p-5">
+        <div class="text-gray-400 text-xs font-semibold uppercase tracking-wider">Diagnostics Active</div>
+        <div class="text-xl font-bold text-white mt-1">Text + Lab & Scan Vision</div>
+        <div class="text-xs text-emerald-400 mt-2">Groq Llama-3.2-Vision</div>
+      </div>
+    </div>
+
+    <!-- Main Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+      <!-- Upload Guidelines Form (5 cols) -->
+      <div class="lg:col-span-5 glass-card rounded-xl p-6 space-y-5">
+        <div>
+          <h2 class="text-base font-bold text-white flex items-center gap-2">
+            <i class="fa-solid fa-file-arrow-up text-emerald-400"></i> Upload Clinical Guidelines
+          </h2>
+          <p class="text-xs text-gray-400 mt-1">
+            Upload Uganda Clinical Guidelines 2023, National Malaria Guidelines, or ART protocols. The document will be chunked and embedded into Supabase pgvector.
+          </p>
+        </div>
+
+        <form id="uploadForm" class="space-y-4">
+          <div>
+            <label class="block text-xs font-medium text-gray-300 mb-1">Document Title</label>
+            <input type="text" id="docTitle" required placeholder="e.g. Uganda Clinical Guidelines 2023"
+                   class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-xs text-white focus:border-emerald-500 outline-none">
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-gray-300 mb-1">Edition / Ministry Year</label>
+            <input type="text" id="docEdition" placeholder="e.g. 2023 Ministry of Health Edition"
+                   class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-xs text-white focus:border-emerald-500 outline-none">
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-gray-300 mb-1">Select PDF Guidelines File</label>
+            <div id="dropZone" class="border-2 border-dashed border-gray-700 hover:border-emerald-500/60 rounded-xl p-6 text-center cursor-pointer transition bg-gray-900/50">
+              <i class="fa-solid fa-file-pdf text-3xl text-emerald-400/80 mb-2"></i>
+              <div class="text-xs text-gray-300 font-medium" id="fileNameLabel">Click to browse or drop PDF here</div>
+              <p class="text-[10px] text-gray-500 mt-1">PDF guidelines up to 150 MB</p>
+              <input type="file" id="pdfFileInput" accept=".pdf" class="hidden">
+            </div>
+          </div>
+
+          <button type="submit" id="submitBtn" class="w-full btn-emerald text-white font-semibold py-2.5 px-4 rounded-lg text-xs flex items-center justify-center gap-2">
+            <i class="fa-solid fa-bolt"></i> Ingest into Knowledge Base
+          </button>
+        </form>
+
+        <div id="alertBox" class="hidden text-xs p-3 rounded-lg"></div>
+
+        <!-- Recent Mobile Money Transactions -->
+        <div class="pt-4 border-t border-gray-800">
+          <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-2 flex items-center gap-1.5">
+            <i class="fa-solid fa-money-bill-transfer text-emerald-400"></i> Recent PesaPal UGX Payments
+          </h3>
+          <div id="ordersList" class="space-y-1.5 text-[11px] text-gray-400">
+            <div>Loading recent mobile money transactions...</div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Right Column: Document Explorer & Diagnostic Test Bench (7 cols) -->
+      <div class="lg:col-span-7 space-y-6">
+
+        <!-- Indexed Knowledge Documents Table -->
+        <div class="glass-card rounded-xl p-6">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-base font-bold text-white flex items-center gap-2">
+              <i class="fa-solid fa-book-bookmark text-emerald-400"></i> Indexed Source Guidelines
+            </h2>
+            <button onclick="loadStats()" class="text-xs text-gray-400 hover:text-white px-2 py-1 rounded bg-gray-800 border border-gray-700">
+              <i class="fa-solid fa-rotate-right"></i> Refresh
+            </button>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs text-gray-300">
+              <thead class="text-[11px] uppercase bg-gray-900/80 text-gray-400 border-b border-gray-800">
+                <tr>
+                  <th class="py-2.5 px-3">Document Title</th>
+                  <th class="py-2.5 px-3">Edition</th>
+                  <th class="py-2.5 px-3 text-center">Vector Chunks</th>
+                </tr>
+              </thead>
+              <tbody id="docsTableBody" class="divide-y divide-gray-800">
+                <tr>
+                  <td colspan="3" class="py-6 text-center text-gray-500">Loading indexed guidelines...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Live Diagnostic Testing Sandbox -->
+        <div class="glass-card rounded-xl p-6 space-y-4">
+          <h2 class="text-base font-bold text-white flex items-center gap-2">
+            <i class="fa-solid fa-stethoscope text-emerald-400"></i> UCG Diagnostic Verification Sandbox
+          </h2>
+          <p class="text-xs text-gray-400">
+            Test clinical prompts or paste lab values to verify treatment steps and exact dosages under Uganda Clinical Guidelines.
+          </p>
+
+          <div class="flex gap-2">
+            <input type="text" id="sandboxPrompt" placeholder="e.g. Management of severe pre-eclampsia at HC IV with magnesium sulfate dosage"
+                   class="flex-1 bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-xs text-white focus:border-emerald-500 outline-none">
+            <button onclick="testSandbox()" id="sandboxBtn" class="btn-emerald text-white text-xs px-4 py-2 rounded-lg font-medium">
+              Run Test
+            </button>
+          </div>
+
+          <div id="sandboxOutput" class="hidden bg-gray-900/90 rounded-lg p-4 text-xs text-gray-200 border border-gray-800 max-h-64 overflow-y-auto whitespace-pre-wrap"></div>
+        </div>
+
+      </div>
+
+    </div>
+
+  </main>
+
+  <footer class="border-t border-gray-800 px-6 py-4 text-center text-xs text-gray-500">
+    Tuna AI Medical Assistant • Dedicated to Uganda Ministry of Health Guidelines Decision Support • Deployed via Vercel & Railway
+  </footer>
+
+  <script>
+    const fileInput = document.getElementById('pdfFileInput');
+    const dropZone = document.getElementById('dropZone');
+    const fileNameLabel = document.getElementById('fileNameLabel');
+    const uploadForm = document.getElementById('uploadForm');
+    const alertBox = document.getElementById('alertBox');
+
+    dropZone.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', () => {
+      if (fileInput.files.length > 0) {
+        fileNameLabel.textContent = fileInput.files[0].name + " (" + (fileInput.files[0].size / 1024 / 1024).toFixed(2) + " MB)";
+      }
+    });
+
+    uploadForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!fileInput.files || fileInput.files.length === 0) {
+        showAlert('Please select a PDF document to upload', 'error');
+        return;
+      }
+
+      const submitBtn = document.getElementById('submitBtn');
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processing Guideline...';
+
+      const formData = new FormData();
+      formData.append('file', fileInput.files[0]);
+      formData.append('title', document.getElementById('docTitle').value);
+      formData.append('edition', document.getElementById('docEdition').value);
+
+      try {
+        const res = await fetch('/api/v1/admin/upload-doc', {
+          method: 'POST',
+          body: formData
+        });
+        const data = await res.json();
+        if (res.ok) {
+          showAlert(`✅ Successfully ingested "${data.title}" (${data.chunks_count} chunks)`, 'success');
+          uploadForm.reset();
+          fileNameLabel.textContent = 'Click to browse or drop PDF here';
+          loadStats();
+        } else {
+          showAlert(`❌ Upload failed: ${data.detail || data.error || 'Server error'}`, 'error');
+        }
+      } catch (err) {
+        showAlert(`❌ Network error: ${err.message}`, 'error');
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="fa-solid fa-bolt"></i> Ingest into Knowledge Base';
+      }
+    });
+
+    function showAlert(msg, type) {
+      alertBox.textContent = msg;
+      alertBox.className = type === 'success' 
+        ? 'text-xs p-3 rounded-lg bg-emerald-950/80 text-emerald-300 border border-emerald-800' 
+        : 'text-xs p-3 rounded-lg bg-red-950/80 text-red-300 border border-red-800';
+      alertBox.classList.remove('hidden');
+    }
+
+    async function loadStats() {
+      try {
+        const res = await fetch('/api/admin-stats');
+        const data = await res.json();
+
+        document.getElementById('statChunks').textContent = data.total_chunks || 0;
+        document.getElementById('statUsers').textContent = data.total_users || 0;
+
+        const tbody = document.getElementById('docsTableBody');
+        tbody.innerHTML = '';
+        if (!data.documents || data.documents.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="3" class="py-6 text-center text-gray-500">No medical guidelines indexed yet. Upload a PDF on the left.</td></tr>';
+        } else {
+          data.documents.forEach(doc => {
+            const tr = document.createElement('tr');
+            tr.className = 'hover:bg-gray-800/40 transition';
+            tr.innerHTML = `
+              <td class="py-3 px-3 font-medium text-white">${doc.title}</td>
+              <td class="py-3 px-3 text-gray-400">${doc.edition || 'Standard'}</td>
+              <td class="py-3 px-3 text-center"><span class="px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800 text-[11px]">${doc.chunks} chunks</span></td>
+            `;
+            tbody.appendChild(tr);
+          });
+        }
+
+        const ordersList = document.getElementById('ordersList');
+        ordersList.innerHTML = '';
+        if (!data.recent_orders || data.recent_orders.length === 0) {
+          ordersList.innerHTML = '<div class="text-gray-500">No transactions recorded yet.</div>';
+        } else {
+          data.recent_orders.forEach(o => {
+            const div = document.createElement('div');
+            div.className = 'flex items-center justify-between p-2 rounded bg-gray-900 border border-gray-800';
+            div.innerHTML = `
+              <div>
+                <span class="font-semibold text-white">${Number(o.amount_paid).toLocaleString()} UGX</span>
+                <span class="text-gray-500 text-[10px]">(${o.credits_to_grant} Credits)</span>
+              </div>
+              <span class="px-2 py-0.5 rounded text-[10px] ${o.status === 'COMPLETED' ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : 'bg-amber-950 text-amber-400 border border-amber-800'}">${o.status}</span>
+            `;
+            ordersList.appendChild(div);
+          });
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    async function testSandbox() {
+      const prompt = document.getElementById('sandboxPrompt').value.trim();
+      if (!prompt) return;
+
+      const btn = document.getElementById('sandboxBtn');
+      const box = document.getElementById('sandboxOutput');
+
+      btn.disabled = true;
+      btn.textContent = 'Analyzing...';
+      box.classList.remove('hidden');
+      box.textContent = 'Synthesizing Uganda Clinical Guidelines protocol via Groq...';
+
+      try {
+        const res = await fetch('/api/query', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt: prompt })
+        });
+        const data = await res.json();
+        box.textContent = data.response || data.error || 'No response generated.';
+      } catch (err) {
+        box.textContent = 'Error: ' + err.message;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Run Test';
+      }
+    }
+
+    loadStats();
+  </script>
+</body>
+</html>

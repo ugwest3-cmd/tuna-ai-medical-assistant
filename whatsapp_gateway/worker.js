@@ -29,7 +29,11 @@ const PORT = process.env.PORT || 8080;
 const SESSION_PATH = process.env.SESSION_PATH || (fs.existsSync('/data') ? '/data/tuna_session' : path.join(__dirname, 'session'));
 const SUPABASE_URL = process.env.SUPABASE_URL || "https://tormcjsptsstcmsaebsl.supabase.co";
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "sb_publishable_rNWGdkRSuYcd1nm_58TSjw_mAj6pAoV";
-const CORE_API_URL = process.env.CORE_API_URL || 'http://localhost:8000';
+let apiUrl = process.env.CORE_API_URL || process.env.VERCEL_URL || 'http://localhost:8000';
+if (apiUrl && !apiUrl.startsWith('http://') && !apiUrl.startsWith('https://')) {
+    apiUrl = `https://${apiUrl}`;
+}
+const CORE_API_URL = apiUrl;
 const INTERNAL_SECRET = process.env.INTERNAL_GATEWAY_SECRET || 'tuna-ai-uganda-secret-2026';
 const PAIRING_NUMBER = process.env.PHONE_NUMBER_FOR_PAIRING; // e.g. "256701234567"
 
