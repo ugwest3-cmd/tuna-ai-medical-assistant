@@ -1,0 +1,7 @@
+# Ignore non-Vercel services so Vercel treats this as a clean, single-service web project
+core_api/
+whatsapp_gateway/
+scripts/
+supabase/
+docker-compose.yml
+Tuna ai Medical Assistant MVP.txt

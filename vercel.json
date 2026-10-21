@@ -1,64 +1,25 @@
 {
-  "version": 2,
-  "name": "tuna-ai-medical-assistant",
-  "builds": [
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "rewrites": [
     {
-      "src": "api/**/*.js",
-      "use": "@vercel/node"
+      "source": "/admin",
+      "destination": "/index.html"
     },
     {
-      "src": "public/**/*",
-      "use": "@vercel/static"
-    }
-  ],
-  "routes": [
-    {
-      "src": "/api/v1/payments/create-order",
-      "dest": "/api/create-order.js"
+      "source": "/api/v1/webhook/pesapal",
+      "destination": "/api/pesapal-ipn"
     },
     {
-      "src": "/api/v1/interpret-lab",
-      "dest": "/api/interpret-lab.js"
+      "source": "/api/v1/payments/create-order",
+      "destination": "/api/create-order"
     },
     {
-      "src": "/api/v1/query",
-      "dest": "/api/query.js"
+      "source": "/api/v1/query",
+      "destination": "/api/query"
     },
     {
-      "src": "/api/v1/webhook/pesapal",
-      "dest": "/api/pesapal-ipn.js"
-    },
-    {
-      "src": "/api/pesapal-ipn",
-      "dest": "/api/pesapal-ipn.js"
-    },
-    {
-      "src": "/api/create-order",
-      "dest": "/api/create-order.js"
-    },
-    {
-      "src": "/api/interpret-lab",
-      "dest": "/api/interpret-lab.js"
-    },
-    {
-      "src": "/api/query",
-      "dest": "/api/query.js"
-    },
-    {
-      "src": "/api/admin-stats",
-      "dest": "/api/admin-stats.js"
-    },
-    {
-      "src": "/api/(.*)",
-      "dest": "/api/$1.js"
-    },
-    {
-      "src": "/admin",
-      "dest": "/public/index.html"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/public/$1"
+      "source": "/api/v1/interpret-lab",
+      "destination": "/api/interpret-lab"
     }
   ]
 }
