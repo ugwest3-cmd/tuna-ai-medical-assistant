@@ -6,6 +6,8 @@
   <title>Tuna AI - Uganda Clinical Guidelines Admin Portal</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <!-- PDF.js library to parse large guidelines PDFs directly in the browser -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <style>
     body { background-color: #0b0f19; color: #cbd5e1; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     .glass-card { background: rgba(17, 24, 39, 0.85); backdrop-filter: blur(12px); border: 1px solid rgba(55, 65, 81, 0.6); }
@@ -53,9 +55,9 @@
         </div>
       </div>
       <div class="glass-card rounded-xl p-5">
-        <div class="text-gray-400 text-xs font-semibold uppercase tracking-wider">pgvector Chunks</div>
+        <div class="text-gray-400 text-xs font-semibold uppercase tracking-wider">Knowledge Chunks</div>
         <div class="text-2xl font-bold text-emerald-400 mt-1" id="statChunks">--</div>
-        <div class="text-xs text-gray-500 mt-2">Supabase (1024 dims)</div>
+        <div class="text-xs text-gray-500 mt-2">Supabase pgvector</div>
       </div>
       <div class="glass-card rounded-xl p-5">
         <div class="text-gray-400 text-xs font-semibold uppercase tracking-wider">Health Workers</div>
@@ -79,7 +81,7 @@
             <i class="fa-solid fa-file-arrow-up text-emerald-400"></i> Upload Clinical Guidelines
           </h2>
           <p class="text-xs text-gray-400 mt-1">
-            Upload Uganda Clinical Guidelines 2023, National Malaria Guidelines, or ART protocols. The document will be chunked and embedded into Supabase pgvector.
+            Upload Uganda Clinical Guidelines 2023, National Malaria Guidelines, or ART protocols. PDFs are processed in browser and saved in real-time batches.
           </p>
         </div>
 
@@ -87,12 +89,14 @@
           <div>
             <label class="block text-xs font-medium text-gray-300 mb-1">Document Title</label>
             <input type="text" id="docTitle" required placeholder="e.g. Uganda Clinical Guidelines 2023"
+                   value="Uganda Clinical Guidelines 2023"
                    class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-xs text-white focus:border-emerald-500 outline-none">
           </div>
 
           <div>
             <label class="block text-xs font-medium text-gray-300 mb-1">Edition / Ministry Year</label>
             <input type="text" id="docEdition" placeholder="e.g. 2023 Ministry of Health Edition"
+                   value="2023 MoH Edition"
                    class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-xs text-white focus:border-emerald-500 outline-none">
           </div>
 
@@ -101,8 +105,19 @@
             <div id="dropZone" class="border-2 border-dashed border-gray-700 hover:border-emerald-500/60 rounded-xl p-6 text-center cursor-pointer transition bg-gray-900/50">
               <i class="fa-solid fa-file-pdf text-3xl text-emerald-400/80 mb-2"></i>
               <div class="text-xs text-gray-300 font-medium" id="fileNameLabel">Click to browse or drop PDF here</div>
-              <p class="text-[10px] text-gray-500 mt-1">PDF guidelines up to 150 MB</p>
+              <p class="text-[10px] text-gray-500 mt-1">PDF guidelines of any size (browser streaming)</p>
               <input type="file" id="pdfFileInput" accept=".pdf" class="hidden">
+            </div>
+          </div>
+
+          <!-- Progress Bar Container -->
+          <div id="uploadProgressContainer" class="hidden space-y-2">
+            <div class="flex justify-between text-xs text-gray-400">
+              <span id="uploadStatusText">Extracting PDF pages in browser...</span>
+              <span id="uploadPercent">0%</span>
+            </div>
+            <div class="w-full bg-gray-800 rounded-full h-2 overflow-hidden">
+              <div id="uploadProgressBar" class="bg-emerald-500 h-2 transition-all duration-300" style="width: 0%"></div>
             </div>
           </div>
 
@@ -188,11 +203,19 @@
   </footer>
 
   <script>
+    // Configure PDF.js worker
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
     const fileInput = document.getElementById('pdfFileInput');
     const dropZone = document.getElementById('dropZone');
     const fileNameLabel = document.getElementById('fileNameLabel');
     const uploadForm = document.getElementById('uploadForm');
     const alertBox = document.getElementById('alertBox');
+    const progressContainer = document.getElementById('uploadProgressContainer');
+    const progressBar = document.getElementById('uploadProgressBar');
+    const statusText = document.getElementById('uploadStatusText');
+    const percentText = document.getElementById('uploadPercent');
+    const submitBtn = document.getElementById('submitBtn');
 
     dropZone.addEventListener('click', () => fileInput.click());
     fileInput.addEventListener('change', () => {
@@ -201,6 +224,18 @@
       }
     });
 
+    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('border-emerald-500'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('border-emerald-500'));
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('border-emerald-500');
+      if (e.dataTransfer.files.length > 0) {
+        fileInput.files = e.dataTransfer.files;
+        fileNameLabel.textContent = fileInput.files[0].name + " (" + (fileInput.files[0].size / 1024 / 1024).toFixed(2) + " MB)";
+      }
+    });
+
+    // Ingest Handler: Extracts PDF in-browser and streams small batches to Vercel
     uploadForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       if (!fileInput.files || fileInput.files.length === 0) {
@@ -208,36 +243,94 @@
         return;
       }
 
-      const submitBtn = document.getElementById('submitBtn');
-      submitBtn.disabled = true;
-      submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processing Guideline...';
+      const file = fileInput.files[0];
+      const title = document.getElementById('docTitle').value.trim() || 'Uganda Clinical Guidelines 2023';
+      const edition = document.getElementById('docEdition').value.trim() || '2023 MoH Edition';
 
-      const formData = new FormData();
-      formData.append('file', fileInput.files[0]);
-      formData.append('title', document.getElementById('docTitle').value);
-      formData.append('edition', document.getElementById('docEdition').value);
+      submitBtn.disabled = true;
+      progressContainer.classList.remove('hidden');
+      progressBar.style.width = '3%';
+      percentText.textContent = '3%';
+      statusText.textContent = `Loading ${file.name}...`;
 
       try {
-        const res = await fetch('/api/v1/admin/upload-doc', {
-          method: 'POST',
-          body: formData
-        });
-        const data = await res.json();
-        if (res.ok) {
-          showAlert(`✅ Successfully ingested "${data.title}" (${data.chunks_count} chunks)`, 'success');
-          uploadForm.reset();
-          fileNameLabel.textContent = 'Click to browse or drop PDF here';
-          loadStats();
-        } else {
-          showAlert(`❌ Upload failed: ${data.detail || data.error || 'Server error'}`, 'error');
+        const arrayBuffer = await file.arrayBuffer();
+        const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+        const pdf = await loadingTask.promise;
+        const totalPages = pdf.numPages;
+
+        let totalChunksSent = 0;
+        let pendingChunks = [];
+        const CHUNK_SIZE = 450;
+        const OVERLAP = 75;
+
+        for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+          const page = await pdf.getPage(pageNum);
+          const textContent = await page.getTextContent();
+          const pageText = textContent.items.map(item => item.str).join(' ').trim();
+          const words = pageText.split(/\s+/);
+
+          if (words.length >= 30) {
+            const step = CHUNK_SIZE - OVERLAP;
+            for (let i = 0; i < words.length; i += step) {
+              const chunkWords = words.slice(i, i + CHUNK_SIZE);
+              if (chunkWords.length >= 30) {
+                pendingChunks.push({
+                  page: pageNum,
+                  content: chunkWords.join(' ')
+                });
+              }
+            }
+          }
+
+          // Update progress
+          const progress = Math.round((pageNum / totalPages) * 85);
+          progressBar.style.width = `${progress}%`;
+          percentText.textContent = `${progress}%`;
+          statusText.textContent = `Page ${pageNum} of ${totalPages} (Saved: ${totalChunksSent} chunks)...`;
+
+          // Stream batches of 25 chunks (small ~15 KB payloads well under Vercel limits)
+          if (pendingChunks.length >= 25) {
+            await sendBatch(title, edition, pendingChunks);
+            totalChunksSent += pendingChunks.length;
+            pendingChunks = [];
+          }
         }
+
+        // Send final remaining chunks
+        if (pendingChunks.length > 0) {
+          await sendBatch(title, edition, pendingChunks);
+          totalChunksSent += pendingChunks.length;
+        }
+
+        progressBar.style.width = '100%';
+        percentText.textContent = '100%';
+        statusText.textContent = 'Ingestion complete!';
+        showAlert(`✅ Successfully ingested "${title}" (${totalPages} pages, ${totalChunksSent} chunks) into Supabase!`, 'success');
+        uploadForm.reset();
+        fileNameLabel.textContent = 'Click to browse or drop PDF here';
+        loadStats();
+
       } catch (err) {
-        showAlert(`❌ Network error: ${err.message}`, 'error');
+        console.error(err);
+        showAlert(`❌ Ingestion error: ${err.message}`, 'error');
       } finally {
         submitBtn.disabled = false;
-        submitBtn.innerHTML = '<i class="fa-solid fa-bolt"></i> Ingest into Knowledge Base';
+        setTimeout(() => progressContainer.classList.add('hidden'), 3500);
       }
     });
+
+    async function sendBatch(title, edition, chunks) {
+      const res = await fetch('/api/ingest-chunks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, edition, chunks })
+      });
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(`Server error (${res.status}): ${errorText}`);
+      }
+    }
 
     function showAlert(msg, type) {
       alertBox.textContent = msg;

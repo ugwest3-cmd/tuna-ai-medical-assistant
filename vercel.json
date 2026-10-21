@@ -20,6 +20,14 @@
     {
       "source": "/api/v1/interpret-lab",
       "destination": "/api/interpret-lab"
+    },
+    {
+      "source": "/api/v1/admin/upload-doc",
+      "destination": "/api/ingest-chunks"
+    },
+    {
+      "source": "/api/v1/admin/upload-chunks",
+      "destination": "/api/ingest-chunks"
     }
   ]
 }
