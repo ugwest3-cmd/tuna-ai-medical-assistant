@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  core-api:
+    build:
+      context: ./core_api
+      dockerfile: Dockerfile
+    container_name: tuna_core_api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+      - TARGET_COUNTRY=Uganda
+      - PRIMARY_CLINICAL_GUIDELINE=Uganda Clinical Guidelines (UCG)
+      - SUPABASE_URL=${SUPABASE_URL:-https://tormcjsptsstcmsaebsl.supabase.co}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY:-sb_publishable_rNWGdkRSuYcd1nm_58TSjw_mAj6pAoV}
+      - INTERNAL_GATEWAY_SECRET=${INTERNAL_GATEWAY_SECRET:-tuna-ai-uganda-secret-2026}
+      - ADMIN_SECRET=${ADMIN_SECRET:-tuna-admin-uganda-pass}
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - GROQ_API_BASE_URL=${GROQ_API_BASE_URL:-https://api.groq.com/openai/v1}
+      - GROQ_TEXT_MODEL=${GROQ_TEXT_MODEL:-llama-3.3-70b-versatile}
+      - GROQ_VISION_MODEL=${GROQ_VISION_MODEL:-llama-3.2-11b-vision-preview}
+      - EMBEDDING_MODEL_NAME=BAAI/bge-large-en-v1.5
+      - PESAPAL_CONSUMER_KEY=${PESAPAL_CONSUMER_KEY}
+      - PESAPAL_CONSUMER_SECRET=${PESAPAL_CONSUMER_SECRET}
+      - PESAPAL_ENV=${PESAPAL_ENV:-sandbox}
+      - PESAPAL_IPN_ID=${PESAPAL_IPN_ID}
+      - WHATSAPP_WORKER_URL=http://whatsapp-gateway:8080
+    networks:
+      - tuna_network
+
+  whatsapp-gateway:
+    build:
+      context: ./whatsapp_gateway
+      dockerfile: Dockerfile
+    container_name: tuna_whatsapp_gateway
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./session_data:/data/tuna_session
+    environment:
+      - PORT=8080
+      - SUPABASE_URL=${SUPABASE_URL:-https://tormcjsptsstcmsaebsl.supabase.co}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY:-sb_publishable_rNWGdkRSuYcd1nm_58TSjw_mAj6pAoV}
+      - CORE_API_URL=http://core-api:8000
+      - INTERNAL_GATEWAY_SECRET=${INTERNAL_GATEWAY_SECRET:-tuna-ai-uganda-secret-2026}
+      - SESSION_PATH=/data/tuna_session
+      - PHONE_NUMBER_FOR_PAIRING=${PHONE_NUMBER_FOR_PAIRING}
+    depends_on:
+      - core-api
+    networks:
+      - tuna_network
+
+networks:
+  tuna_network:
+    driver: bridge

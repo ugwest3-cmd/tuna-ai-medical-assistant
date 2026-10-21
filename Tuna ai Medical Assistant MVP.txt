@@ -1,0 +1,322 @@
+Here is the updated, production-ready blueprint for Tuna AI Medical Assistant.
+This modern cloud architecture replaces local Docker requirements with an enterprise-grade cloud stack:
+1. Supabase: Hosts your relational tables, tracks user credits, manages transactions, and natively stores your medical textbook embeddings using the pgvector extension.
+2. Vercel: Hosts your Node.js backend API routes (/api/v1/webhook/pesapal and /api/v1/chat/whatsapp) for lightning-fast, serverless scaling.
+3. Railway: Dedicated cloud container instances that host your Baileys WhatsApp worker (needing a persistent, stateful connection to avoid dropping the WhatsApp stream) and your Python/FastAPI extraction engine.
+
+Part 1: Supabase Database Blueprint & SQL Initialization
+
+Log into your Supabase Dashboard, open the SQL Editor, and execute the following script. This activates pgvector and sets up your tables under one roof.
+sql
+-- 1. Enable the native PostgreSQL vector extension inside Supabase
+create extension if not exists vector;
+
+-- 2. Establish baseline data structures
+create type account_status as enum ('active', 'suspended', 'trial');
+create type transaction_type as enum ('purchase', 'usage_deduction', 'admin_grant', 'trial_grant');
+create type payment_status as enum ('PENDING', 'COMPLETED', 'FAILED');
+
+-- Users tracking registry
+create table users (
+id uuid default gen_random_uuid() primary key,
+whatsapp_id varchar(50) unique not null,
+credit_balance int default 20 not null,
+status account_status default 'trial' not null,
+created_at timestamp with time zone default current_timestamp not null,
+updated_at timestamp with time zone default current_timestamp not null
+);
+
+-- Financial billing ledger
+create table credit_transactions (
+id uuid default gen_random_uuid() primary key,
+user_id uuid references users(id) on delete cascade not null,
+amount int not null,
+tx_type transaction_type not null,
+timestamp timestamp with time zone default current_timestamp not null
+);
+
+-- PesaPal mobile money transaction router logs
+create table payment_orders (
+id uuid default gen_random_uuid() primary key,
+user_id uuid references users(id) on delete cascade not null,
+pesapal_order_tracking_id varchar(100) unique,
+merchant_reference varchar(100) unique not null,
+amount_paid numeric(10, 2) not null,
+credits_to_grant int not null,
+status payment_status default 'PENDING' not null,
+created_at timestamp with time zone default current_timestamp not null
+);
+
+-- Unified Vector Knowledge Base (Stores parsed medical books)
+create table medical_knowledge (
+id uuid default gen_random_uuid() primary key,
+document_title text,
+page_number int,
+content text not null,
+embedding vector(1024) -- Perfectly matched to BAAI/bge-large-en-v1.5 embeddings dimensions
+);
+
+-- Performance and safety audit logs
+create table chat_logs (
+id uuid default gen_random_uuid() primary key,
+user_id uuid references users(id) on delete cascade not null,
+incoming_message text not null,
+ai_response text not null,
+created_at timestamp with time zone default current_timestamp not null
+);
+
+-- Performance indexing optimizations
+create index idx_users_wa on users(whatsapp_id);
+create index idx_orders_ref on payment_orders(merchant_reference);
+Use code with caution.
+
+Part 2: The Core RAG AI Pipeline (Python + FastAPI on Railway)
+
+Save this file as main.py inside your Python service directory. In Railway, you will deploy this as a continuous web service container using a standard Dockerfile or Railway Nixpack build.
+python
+import os
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+from supabase import create_client, Client
+from llama_index.llms.ollama import Ollama
+from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+
+app = FastAPI(title="Tuna AI - Cloud Core RAG Engine")
+
+1. Gather Supabase Cloud Credentials from Env Variables
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+Initialize cognitive structures
+embed_model = HuggingFaceEmbedding(model_name="BAAI/bge-large-en-v1.5")
+Points to an Ollama instance or DeepSeek API route hosted on Railway
+llm = Ollama(model="deepseek-r1:14b", request_timeout=120.0)
+
+class ChatRequest(BaseModel):
+prompt: str
+
+TUNA_PROMPT = """
+You are Tuna AI Medical Assistant. Answer using ONLY the textbook references below.
+Structure your output explicitly into:
+1. DEFINITION & CLINICAL OVERVIEW
+2. DIFFERENTIAL DIAGNOSIS (DDx)
+3. DIAGNOSTIC & ASSESSMENT PLAN
+4. THERAPEUTIC MANAGEMENT PLAN
+"""
+
+@app.post("/api/v1/query")
+async def process_clinical_query(payload: ChatRequest):
+try:
+# Generate mathematical representation of query text locally
+query_vector = embed_model.get_text_embedding(payload.prompt)
+
+# Pull best textbook text chunks straight out of Supabase using cosine similarity RPC
+rpc_res = supabase.rpc(
+"match_medical_knowledge",
+{"query_embedding": query_vector, "match_threshold": 0.7, "match_count": 4}
+).execute()
+
+context = "\n".join([chunk['content'] for chunk in rpc_res.data])
+
+if not context:
+return {"response": "Insufficient source database references to provide an accurate diagnostic framework."}
+
+full_input = f"{TUNA_PROMPT}\n\nContext:\n{context}\n\nQuery: {payload.prompt}"
+ai_res = llm.complete(full_input)
+
+return {"response": str(ai_res)}
+except Exception as e:
+raise HTTPException(status_code=500, detail=str(e))
+Use code with caution.
+
+Part 3: PesaPal Billing Webhook Engine (Node.js on Vercel)
+
+Save this file as api/pesapal-ipn.js in a Vercel serverless folder structure. Vercel routes this function execution out to instantly scaling microservices whenever a user buys credits.
+javascript
+import { createClient } from '@supabase/supabase-client';
+import axios from 'axios';
+
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+const PESAPAL_BASE_URL = "https://pesapal.com"; // Sandbox mode URL
+
+export default async function handler(req, res) {
+if (req.method !== 'POST') return res.status(405).json({ error: 'Method Not Allowed' });
+
+const { OrderTrackingId, MerchantReference, NotificationType } = req.body;
+
+// Immediately tell PesaPal your Vercel serverless function caught the data
+res.status(200).json({ received: true });
+
+if (NotificationType === "CHANGE") {
+try {
+// Get PesaPal authentication token
+const authRes = await axios.post(${PESAPAL_BASE_URL}/Auth/RequestToken`, {
+consumer_key: process.env.PESAPAL_KEY,
+consumer_secret: process.env.PESAPAL_SECRET
+});
+const token = authRes.data.token;
+
+// Fetch transaction payment validation parameters
+const txRes = await axios.get(``${PESAPAL_BASE_URL}/Transactions/GetTransactionStatus?orderTrackingId=latex
+{OrderTrackingId}`, { headers: { Authorization: `Bearer 
+
+{token}` }
+});
+
+if (txRes.data.payment_status_description === "COMPLETED") {
+// Read original order out of Supabase
+const { data: order } = await supabase
+.from('payment_orders')
+.select('*')
+.eq('merchant_reference', MerchantReference)
+.single();
+
+if (order && order.status === 'PENDING') {
+// 1. Finalize payment record
+await supabase.from('payment_orders').update({ status: 'COMPLETED' }).eq('id', order.id);
+// 2. Increment user credit account balance allocation
+await supabase.rpc('increment_user_credits', { user_uuid: order.user_id, amount_to_add: order.credits_to_grant });
+// 3. Document ledger tracking sequence
+await supabase.from('credit_transactions').insert({ user_id: order.user_id, amount: order.credits_to_grant, tx_type: 'purchase' });
+
+// Trigger asynchronous notification push out to the live running WhatsApp network number
+await axios.post(${process.env.RAILWAY_WHATSAPP_WORKER_URL}/api/v1/send-confirmation`, {
+userId: order.user_id,
+credits: order.credits_to_grant
+});
+}
+}
+} catch (err) {
+console.error("Vercel Ledger Processing Exception:", err.message);
+}
+}
+}
+Use code with caution.
+
+Part 4: Persistent WhatsApp Baileys Worker (Node.js on Railway)
+
+Save this file as worker.js. Because Baileys requires an active WebSocket stream open 24/7 to look for incoming WhatsApp texts without falling asleep, you cannot host it on Vercel. You deploy this to Railway as a stateful background worker.
+javascript
+const { default: makeWASocket, useMultiFileAuthState } = require('@whiskeysockets/baileys');
+const { createClient } = require('@supabase/supabase-client');
+const express = require('express');
+const axios = require('axios');
+const path = require('path');
+
+const app = express();
+app.use(express.json());
+
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+let sock;
+
+async function runTunaWorker() {
+// Railway provides persistent disk mounts to cache your session credentials safely
+const { state, saveCreds } = await useMultiFileAuthState(path.join('/data', 'tuna_session'));
+
+sock = makeWASocket({ auth: state, printQRInTerminal: true });
+sock.ev.on('creds.update', saveCreds);
+
+sock.ev.on('messages.upsert', async ({ messages }) => {
+const msg = messages[0];
+if (!msg.message || msg.key.fromMe) return;
+
+const userPhone = msg.key.remoteJid;
+const text = msg.message.conversation || msg.message.extendedTextMessage?.text;
+if (!text) return;
+
+// Fetch User state directly from Supabase Cloud
+let { data: user } = await supabase.from('users').select('*').eq('whatsapp_id', userPhone).single();
+
+if (!user) {
+// New user instant provisioning pipeline
+const { data: newUser } = await supabase.from('users').insert({ whatsapp_id: userPhone, credit_balance: 20 }).select().single();
+await supabase.from('credit_transactions').insert({ user_id: newUser.id, amount: 20, tx_type: 'trial_grant' });
+await sock.sendMessage(userPhone, { text: "🩺 Welcome to Tuna AI Medical Assistant! Type BUY to see pricing options." });
+return;
+}
+
+if (user.status === 'suspended') return;
+
+if (text.trim().toUpperCase() === "BUY") {
+await sock.sendMessage(userPhone, { text: "💳 Top-Up Options:\nReply 1 for 100 Credits (10,000 UGX)\nReply 2 for 300 Credits (25,000 UGX)" });
+return;
+}
+
+// Package selection triggers logic hook to Vercel billing link parameters
+if (text.trim() === "1" || text.trim() === "2") {
+await sock.sendMessage(userPhone, { text: "⏳ Generating your secure PesaPal payment link..." });
+// Direct request out to Vercel endpoint to fetch transaction payment screen link
+const linkRes = await axios.post(``${process.env.VERCEL_API_URL}/api/generate-link, { userId: user.id, phone: userPhone, choice: text }); await sock.sendMessage(userPhone, { text:🔗 Secure Checkout Link:\n${linkRes.data.url} });
+return;
+}
+
+if (user.credit_balance <= 0) {
+await sock.sendMessage(userPhone, { text: "⚠️ Out of Credits. Type BUY to replenish balances." });
+return;
+}
+
+// Trigger AI engine request
+await sock.sendPresenceUpdate('composing', userPhone);
+const aiEngineRes = await axios.post(``${process.env.RAILWAY_AI_URL}/api/v1/query`, { prompt: text });
+
+// Deduct balance and update logs inside Supabase cloud storage records
+await supabase.rpc('deduct_credit', { user_id: user.id });
+await supabase.from('chat_logs').insert({ user_id: user.id, incoming_message: text, ai_response: aiEngineRes.data.response });
+
+await sock.sendMessage(userPhone, { text: aiEngineRes.data.response });
+});
+}
+
+// REST route endpoint for Vercel to ping when PesaPal updates transactions status
+app.post('/api/v1/send-confirmation', async (req, res) => {
+const { userId, credits } = req.body;
+const { data: user } = await supabase.from('users').select('whatsapp_id').eq('id', userId).single();
+if (user && sock) {
+await sock.sendMessage(user.whatsapp_id, { text: ✅ *Payment Confirmed!* +${credits} Credits added. });
+}
+res.sendStatus(200);
+});
+
+app.listen(process.env.PORT || 8080, () => {
+runTunaWorker();
+});
+Use code with caution.
+
+Part 5: Infrastructure Setup & Deployment Architecture
+
+Follow this explicit production workflow sequence to launch the final architectural pipeline:
+text
+[ User Device ] ──( WhatsApp WebSocket )──► [ Baileys Worker on Railway ]
+│
+┌────────────────────────────────────────┴────────────────────────────────────────┐
+▼ (RAG Loop Queries) ▼ (Topup Request Routing)
+[ FastAPI App on Railway ] [ Webhook APIs on Vercel ]
+│ │
+▼ (Database / Vector Lookup Call Vectors) ▼ (Balance Operations)
+┌────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ Supabase Cloud Platform (PostgreSQL) │
+└────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+Use code with caution.
+
+1. Setup Cloud Groundwork Layers (Supabase)
+
+• Create your free account project tier on the Supabase Cloud Platform.
+• Execute the SQL script initialization query blocks listed in Part 1 inside the built-in console workspace tool.
+
+2. Push Core Webhook Files Out (Vercel)
+
+• Initialize your JavaScript API application workspace tracking settings locally using Git.
+• Run vercel login inside your dev console workspace interface.
+• Execute vercel --prod to deploy your PesaPal IPN script code parameters live onto the web instantly, yielding your operational endpoint addresses.
+
+3. Establish Persistent Streaming & Inference (Railway)
+
+• Open the Railway Dashboard interface and create two separate service panels.
+• Service A (Python Engine): Link your GitHub repository holding main.py and set the environment flags (SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY).
+• Service B (Baileys Worker): Create a Volume mount (/data) under service instance settings to cache the tracking token states securely. Set the configuration strings (VERCEL_API_URL, SUPABASE_URL).
+• Scan the generated output terminal logging screen QR Code block using your phone's WhatsApp account configuration tool to link Tuna AI Medical Assistant to the live production network.
+Now that the architecture is fully optimized for cloud deployment across Supabase, Vercel, and Railway, let me know:
+• Do you want to write the Supabase RPC database functions (deduct_credit and increment_user_credits) to handle the credit adjustments cleanly?
+• Should we configure GitHub Actions automated testing to automatically verify your Python and Node code builds before they deploy to Railway and Vercel?
+Let me know what we should script next!

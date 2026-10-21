@@ -1,0 +1,24 @@
+# Node dependencies
+node_modules/
+package-lock.json
+
+# Python virtual environment & cache
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+
+# Environment files with secrets
+.env
+.env.local
+
+# WhatsApp session data (Railway mounts volume to /data)
+session/
+session_data/
+tuna_session/
+
+# OS artifacts
+.DS_Store
+Thumbs.db
