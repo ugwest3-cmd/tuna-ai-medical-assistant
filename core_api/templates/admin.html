@@ -173,6 +173,59 @@
 
     </div>
 
+    <!-- WhatsApp Gateway QR Panel -->
+    <div class="glass-card rounded-xl p-6 space-y-4">
+      <div class="flex items-center justify-between">
+        <h2 class="text-base font-bold text-white flex items-center gap-2">
+          <i class="fa-brands fa-whatsapp text-emerald-400"></i> WhatsApp Gateway Connection
+        </h2>
+        <div id="waStatusBadge" class="text-xs px-3 py-1 rounded-full bg-gray-800 border border-gray-700 text-gray-400">
+          ● Checking...
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+        <!-- QR Display -->
+        <div class="flex flex-col items-center justify-center bg-gray-900/60 rounded-xl border border-gray-800 p-6 min-h-[260px]">
+          <div id="qrSpinner" class="text-gray-500 text-sm text-center space-y-2">
+            <i class="fa-solid fa-spinner fa-spin text-2xl text-emerald-400"></i>
+            <p>Enter your Gateway URL &amp; secret to load QR</p>
+          </div>
+          <img id="qrImage" src="" alt="WhatsApp QR Code" class="hidden rounded-lg w-64 h-64 object-contain border border-emerald-800">
+          <p id="qrOnlineMsg" class="hidden text-emerald-400 font-semibold text-center text-sm">
+            <i class="fa-solid fa-circle-check text-xl"></i><br>WhatsApp is Connected!
+          </p>
+        </div>
+
+        <!-- Controls -->
+        <div class="space-y-4">
+          <div>
+            <label class="block text-xs font-medium text-gray-300 mb-1">Gateway Worker URL</label>
+            <input type="text" id="gatewayUrl" placeholder="https://tuna.up.railway.app"
+                   class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white focus:border-emerald-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-300 mb-1">Gateway Secret</label>
+            <input type="password" id="gatewaySecret" placeholder="tuna-ai-uganda-secret-2026"
+                   class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white focus:border-emerald-500 outline-none">
+          </div>
+          <div class="flex gap-3">
+            <button onclick="loadQR()" class="flex-1 btn-emerald text-white font-semibold py-2.5 px-4 rounded-lg text-sm flex items-center justify-center gap-2">
+              <i class="fa-solid fa-qrcode"></i> Load QR Code
+            </button>
+            <button onclick="resetGatewaySession()" class="bg-red-950 hover:bg-red-900 border border-red-800 text-red-300 font-semibold py-2.5 px-4 rounded-lg text-sm flex items-center gap-2">
+              <i class="fa-solid fa-rotate-right"></i> Reset Session
+            </button>
+          </div>
+          <p class="text-xs text-gray-500">
+            Scan the QR code with WhatsApp → <strong>Settings → Linked Devices → Link a Device</strong>.<br>
+            QR refreshes every 5 seconds automatically.
+          </p>
+          <div id="gatewayAlertBox" class="hidden text-xs p-3 rounded-lg"></div>
+        </div>
+      </div>
+    </div>
+
   </main>
 
   <footer class="border-t border-gray-800 px-6 py-4 text-center text-xs text-gray-500">
@@ -367,8 +420,124 @@
       }
     }
 
+
+    // ── WhatsApp QR Panel ─────────────────────────────────────────────
+    let qrPollInterval = null;
+
+    // Persist gateway settings in localStorage
+    const savedGwUrl = localStorage.getItem('tuna_gateway_url');
+    const savedGwSecret = localStorage.getItem('tuna_gateway_secret');
+    if (savedGwUrl) document.getElementById('gatewayUrl').value = savedGwUrl;
+    if (savedGwSecret) document.getElementById('gatewaySecret').value = savedGwSecret;
+
+    function getGatewayConfig() {
+      const url = document.getElementById('gatewayUrl').value.trim().replace(/\/$/, '');
+      const secret = document.getElementById('gatewaySecret').value.trim() || 'tuna-ai-uganda-secret-2026';
+      localStorage.setItem('tuna_gateway_url', url);
+      localStorage.setItem('tuna_gateway_secret', secret);
+      return { url, secret };
+    }
+
+    function setWaStatus(status) {
+      const badge = document.getElementById('waStatusBadge');
+      if (status === 'online') {
+        badge.className = 'text-xs px-3 py-1 rounded-full bg-emerald-950 border border-emerald-700 text-emerald-400';
+        badge.textContent = '● Connected';
+      } else if (status === 'qr_ready') {
+        badge.className = 'text-xs px-3 py-1 rounded-full bg-yellow-950 border border-yellow-700 text-yellow-400';
+        badge.textContent = '● Scan QR Code';
+      } else {
+        badge.className = 'text-xs px-3 py-1 rounded-full bg-gray-800 border border-gray-700 text-gray-400';
+        badge.textContent = '● Waiting...';
+      }
+    }
+
+    async function fetchQR() {
+      const { url, secret } = getGatewayConfig();
+      if (!url) return;
+
+      const qrImage = document.getElementById('qrImage');
+      const qrSpinner = document.getElementById('qrSpinner');
+      const qrOnlineMsg = document.getElementById('qrOnlineMsg');
+
+      try {
+        // First check status via JSON
+        const res = await fetch(`${url}/api/v1/internal/qr?secret=${encodeURIComponent(secret)}`);
+        const contentType = res.headers.get('content-type') || '';
+
+        if (contentType.includes('image/png')) {
+          // QR image returned
+          const blob = await res.blob();
+          const objectUrl = URL.createObjectURL(blob);
+          qrImage.src = objectUrl;
+          qrImage.classList.remove('hidden');
+          qrSpinner.classList.add('hidden');
+          qrOnlineMsg.classList.add('hidden');
+          setWaStatus('qr_ready');
+        } else {
+          const data = await res.json();
+          if (data.status === 'online') {
+            qrImage.classList.add('hidden');
+            qrSpinner.classList.add('hidden');
+            qrOnlineMsg.classList.remove('hidden');
+            setWaStatus('online');
+            clearInterval(qrPollInterval); // stop polling once connected
+          } else {
+            qrSpinner.classList.remove('hidden');
+            qrImage.classList.add('hidden');
+            qrOnlineMsg.classList.add('hidden');
+            setWaStatus('waiting');
+          }
+        }
+      } catch (err) {
+        showGatewayAlert('Cannot reach gateway: ' + err.message, 'error');
+      }
+    }
+
+    function loadQR() {
+      clearInterval(qrPollInterval);
+      fetchQR();
+      qrPollInterval = setInterval(fetchQR, 5000);
+    }
+
+    async function resetGatewaySession() {
+      const { url, secret } = getGatewayConfig();
+      if (!url) { showGatewayAlert('Enter the Gateway URL first', 'error'); return; }
+      showGatewayAlert('Resetting session...', 'info');
+      try {
+        const res = await fetch(`${url}/api/v1/internal/reset-session`, {
+          method: 'POST',
+          headers: { 'x-secret': secret, 'Content-Type': 'application/json' }
+        });
+        const data = await res.json();
+        if (data.success) {
+          showGatewayAlert('Session reset! QR will appear in ~3 seconds...', 'success');
+          setTimeout(loadQR, 3500);
+        } else {
+          showGatewayAlert(data.error || 'Reset failed', 'error');
+        }
+      } catch (err) {
+        showGatewayAlert('Cannot reach gateway: ' + err.message, 'error');
+      }
+    }
+
+    function showGatewayAlert(msg, type) {
+      const box = document.getElementById('gatewayAlertBox');
+      box.textContent = msg;
+      box.className = type === 'success'
+        ? 'text-xs p-3 rounded-lg bg-emerald-950/80 text-emerald-300 border border-emerald-800'
+        : type === 'info'
+        ? 'text-xs p-3 rounded-lg bg-blue-950/80 text-blue-300 border border-blue-800'
+        : 'text-xs p-3 rounded-lg bg-red-950/80 text-red-300 border border-red-800';
+      box.classList.remove('hidden');
+    }
+
+    // Auto-load QR if gateway URL was previously saved
+    if (savedGwUrl) loadQR();
+
     // Initial load
     loadKnowledgeDocs();
+
   </script>
 </body>
 </html>

@@ -42,6 +42,8 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
     realtime: { transport: ws }
 });
 let sock = null;
+let latestQR = null;          // stores the current QR code string
+let waStatus = 'disconnected'; // 'disconnected' | 'qr_ready' | 'online'
 
 
 // Wipe all session files so a clean pairing code can be generated on next start
@@ -102,7 +104,14 @@ async function startWhatsAppWorker() {
     sock.ev.on('creds.update', saveCreds);
 
     sock.ev.on('connection.update', (update) => {
-        const { connection, lastDisconnect } = update;
+        const { connection, lastDisconnect, qr } = update;
+
+        // Capture QR code for the admin panel
+        if (qr) {
+            latestQR = qr;
+            waStatus = 'qr_ready';
+            console.log('[Worker] QR code ready — scan via admin panel at /api/v1/internal/qr');
+        }
 
         if (connection === 'close') {
             const statusCode = lastDisconnect?.error?.output?.statusCode;
@@ -117,6 +126,8 @@ async function startWhatsAppWorker() {
                 setTimeout(startWhatsAppWorker, 3000);
             }
         } else if (connection === 'open') {
+            latestQR = null;
+            waStatus = 'online';
             console.log('✅ [Worker] Tuna AI WhatsApp Gateway is ONLINE (Uganda Decision Support).');
         }
     });
@@ -349,6 +360,32 @@ app.post('/api/v1/internal/send-notification', async (req, res) => {
         }
     } else {
         return res.status(503).json({ error: 'WhatsApp socket not initialized' });
+    }
+});
+
+// QR Code endpoint — serves the live WhatsApp QR as a PNG image for the admin panel
+app.get('/api/v1/internal/qr', async (req, res) => {
+    const authSecret = req.headers['x-secret'] || req.query.secret;
+    if (authSecret !== INTERNAL_SECRET) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    if (waStatus === 'online') {
+        return res.json({ status: 'online', message: 'WhatsApp is already connected.' });
+    }
+
+    if (!latestQR) {
+        return res.json({ status: 'waiting', message: 'QR not yet generated. Please wait or reset the session.' });
+    }
+
+    try {
+        const QRCode = require('qrcode');
+        const pngBuffer = await QRCode.toBuffer(latestQR, { type: 'png', width: 300, margin: 2 });
+        res.setHeader('Content-Type', 'image/png');
+        res.setHeader('Cache-Control', 'no-store');
+        return res.send(pngBuffer);
+    } catch (err) {
+        return res.status(500).json({ error: err.message });
     }
 });
 
