@@ -15,6 +15,7 @@ const {
     downloadMediaMessage
 } = require('@whiskeysockets/baileys');
 const { createClient } = require('@supabase/supabase-js');
+const ws = require('ws');
 const express = require('express');
 const axios = require('axios');
 const path = require('path');
@@ -37,7 +38,9 @@ const CORE_API_URL = apiUrl;
 const INTERNAL_SECRET = process.env.INTERNAL_GATEWAY_SECRET || 'tuna-ai-uganda-secret-2026';
 const PAIRING_NUMBER = process.env.PHONE_NUMBER_FOR_PAIRING; // e.g. "256701234567"
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+    realtime: { transport: ws }
+});
 let sock = null;
 
 async function startWhatsAppWorker() {
