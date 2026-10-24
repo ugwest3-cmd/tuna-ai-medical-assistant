@@ -61,6 +61,13 @@ function clearSession() {
 
 async function startWhatsAppWorker() {
     console.log(`[Worker] Initializing auth state at: ${SESSION_PATH}`);
+
+    // If CLEAR_SESSION=true is set in Railway Variables, wipe session for fresh pairing
+    if (process.env.CLEAR_SESSION === 'true') {
+        console.log('[Worker] CLEAR_SESSION=true detected. Wiping session for fresh pairing...');
+        clearSession();
+    }
+
     if (!fs.existsSync(SESSION_PATH)) {
         fs.mkdirSync(SESSION_PATH, { recursive: true });
     }
