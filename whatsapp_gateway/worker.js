@@ -43,6 +43,22 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
 });
 let sock = null;
 
+
+// Wipe all session files so a clean pairing code can be generated on next start
+function clearSession() {
+    try {
+        if (fs.existsSync(SESSION_PATH)) {
+            const files = fs.readdirSync(SESSION_PATH);
+            for (const file of files) {
+                fs.rmSync(path.join(SESSION_PATH, file), { recursive: true, force: true });
+            }
+            console.log(`[Worker] Session cleared (${files.length} file(s) removed).`);
+        }
+    } catch (err) {
+        console.error('[Worker] Failed to clear session:', err.message);
+    }
+}
+
 async function startWhatsAppWorker() {
     console.log(`[Worker] Initializing auth state at: ${SESSION_PATH}`);
     if (!fs.existsSync(SESSION_PATH)) {
@@ -85,11 +101,13 @@ async function startWhatsAppWorker() {
             const statusCode = lastDisconnect?.error?.output?.statusCode;
             const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
             console.log(`[Worker] Connection closed (code ${statusCode}). Reconnecting: ${shouldReconnect}`);
-            
+
             if (shouldReconnect) {
                 setTimeout(startWhatsAppWorker, 3000);
             } else {
-                console.log('[Worker] Logged out. Delete session folder and restart to re-pair.');
+                console.log('[Worker] Logged out (401). Clearing stale session and restarting for fresh pairing...');
+                clearSession();
+                setTimeout(startWhatsAppWorker, 3000);
             }
         } else if (connection === 'open') {
             console.log('✅ [Worker] Tuna AI WhatsApp Gateway is ONLINE (Uganda Decision Support).');
@@ -325,6 +343,23 @@ app.post('/api/v1/internal/send-notification', async (req, res) => {
     } else {
         return res.status(503).json({ error: 'WhatsApp socket not initialized' });
     }
+});
+
+// Reset session endpoint — clears stale WhatsApp credentials and triggers fresh pairing
+app.post('/api/v1/internal/reset-session', (req, res) => {
+    const authSecret = req.headers['x-secret'];
+    if (authSecret !== INTERNAL_SECRET) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    console.log('[Worker] Manual session reset requested via HTTP.');
+    if (sock) {
+        try { sock.end(); } catch (_) {}
+        sock = null;
+    }
+    clearSession();
+    setTimeout(startWhatsAppWorker, 1000);
+    return res.json({ success: true, message: 'Session cleared. Fresh pairing code will appear in logs.' });
 });
 
 app.listen(PORT, () => {
