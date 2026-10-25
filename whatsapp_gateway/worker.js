@@ -25,6 +25,15 @@ const fs = require('fs');
 const app = express();
 app.use(express.json());
 
+// Allow cross-origin requests from the Vercel admin panel
+app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, x-secret');
+    if (req.method === 'OPTIONS') return res.sendStatus(204);
+    next();
+});
+
 // Configuration
 const PORT = process.env.PORT || 8080;
 const SESSION_PATH = process.env.SESSION_PATH || (fs.existsSync('/data') ? '/data/tuna_session' : path.join(__dirname, 'session'));
