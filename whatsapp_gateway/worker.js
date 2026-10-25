@@ -229,8 +229,12 @@ async function startWhatsAppWorker() {
         version,
         auth: state,
         logger: pino({ level: 'error' }),
-        printQRInTerminal: !PAIRING_NUMBER,
-        browser: ['Tuna AI Uganda', 'Chrome', '2.0.0']
+        browser: ['Tuna AI Uganda', 'Chrome', '2.0.0'],
+        syncFullHistory: false,           // Skip full chat history sync on boot (prevents init query timeouts)
+        defaultQueryTimeoutMs: 120000,    // Extended query timeout (120s) for cloud infrastructure resilience
+        connectTimeoutMs: 60000,
+        keepAliveIntervalMs: 30000,
+        markOnlineOnConnect: true
     });
 
     // 8-Digit Pairing Code (Ideal for Headless Cloud Logs like Railway)
@@ -254,11 +258,17 @@ async function startWhatsAppWorker() {
     sock.ev.on('connection.update', (update) => {
         const { connection, lastDisconnect, qr } = update;
 
-        // Capture QR code for the admin panel
+        // Capture QR code for the admin panel and terminal
         if (qr) {
             latestQR = qr;
             waStatus = 'qr_ready';
             console.log('[Worker] QR code ready — scan via admin panel at /api/v1/internal/qr');
+            if (!PAIRING_NUMBER) {
+                try {
+                    const qrcodeTerminal = require('qrcode-terminal');
+                    qrcodeTerminal.generate(qr, { small: true });
+                } catch (_) {}
+            }
         }
 
         if (connection === 'close') {
