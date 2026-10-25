@@ -6,6 +6,18 @@
       "destination": "/index.html"
     },
     {
+      "source": "/api/v1/admin/verify-auth",
+      "destination": "/api/verify-auth"
+    },
+    {
+      "source": "/api/v1/admin/knowledge-stats",
+      "destination": "/api/admin-stats"
+    },
+    {
+      "source": "/api/v1/admin/users",
+      "destination": "/api/admin-users"
+    },
+    {
       "source": "/api/v1/webhook/pesapal",
       "destination": "/api/pesapal-ipn"
     },

@@ -13,260 +13,525 @@
     .glass-card { background: rgba(17, 24, 39, 0.85); backdrop-filter: blur(12px); border: 1px solid rgba(55, 65, 81, 0.6); }
     .btn-emerald { background: linear-gradient(135deg, #10b981 0%, #059669 100%); transition: all 0.2s ease; }
     .btn-emerald:hover { filter: brightness(1.1); transform: translateY(-1px); }
+
+    /* Tab navigation */
+    .tab-btn { transition: all 0.2s ease; border-bottom: 2px solid transparent; }
+    .tab-btn.active { color: #10b981; border-bottom-color: #10b981; }
+    .tab-btn:not(.active) { color: #6b7280; }
+    .tab-btn:not(.active):hover { color: #9ca3af; }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* Modal */
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 200; align-items: center; justify-content: center; }
+    .modal-overlay.open { display: flex; }
+
+    /* Badges */
+    .badge-professional { background: rgba(16,185,129,0.15); color: #34d399; border: 1px solid rgba(16,185,129,0.4); }
+    .badge-student      { background: rgba(59,130,246,0.15); color: #60a5fa; border: 1px solid rgba(59,130,246,0.4); }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: #161b22; }
+    ::-webkit-scrollbar-thumb { background: #30363d; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #10b981; }
+
+    .user-row { cursor: pointer; transition: background 0.15s; }
+    .user-row:hover { background: rgba(16,185,129,0.06) !important; }
   </style>
 </head>
 <body class="min-h-screen flex flex-col">
 
-  <!-- Top Navigation -->
-  <header class="border-b border-gray-800 bg-gray-900/90 sticky top-0 z-50 px-6 py-4 flex items-center justify-between">
-    <div class="flex items-center space-x-3">
-      <div class="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-xl border border-emerald-500/40">
-        🩺
-      </div>
-      <div>
-        <h1 class="text-lg font-bold text-white flex items-center gap-2">
-          Tuna AI <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800">Uganda 🇺🇬</span>
-        </h1>
-        <p class="text-xs text-gray-400">Clinical Guidelines & Diagnostic Intelligence Admin Portal</p>
-      </div>
-    </div>
-    <div class="flex items-center space-x-4">
-      <div class="text-right hidden sm:block">
-        <span class="text-xs text-gray-500 block">AI Infrastructure</span>
-        <span class="text-xs font-semibold text-emerald-400 flex items-center gap-1">
-          <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Groq Cloud + Supabase
-        </span>
-      </div>
-      <span class="px-2.5 py-1 rounded-md text-xs font-medium bg-gray-800 text-gray-300 border border-gray-700">
-        <i class="fa-solid fa-cloud text-blue-400 mr-1"></i> Vercel Serverless
-      </span>
-    </div>
-  </header>
-
-  <main class="flex-1 max-w-7xl w-full mx-auto p-6 space-y-6">
-
-    <!-- KPI Metric Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-      <div class="glass-card rounded-xl p-5">
-        <div class="text-gray-400 text-xs font-semibold uppercase tracking-wider">Clinical Framework</div>
-        <div class="text-xl font-bold text-white mt-1">Uganda Clinical Guidelines</div>
-        <div class="text-xs text-emerald-400 mt-2 flex items-center gap-1">
-          <i class="fa-solid fa-check-double"></i> Zero Page Citations Strict Mode
+  <!-- ════════════════════════════════════════════════════════════════ -->
+  <!--  SECURE LOGIN GATE (Displayed when unauthenticated)             -->
+  <!-- ════════════════════════════════════════════════════════════════ -->
+  <div id="loginGate" class="min-h-screen flex items-center justify-center p-4 bg-[#090d14]">
+    <div class="glass-card max-w-md w-full rounded-2xl p-8 shadow-2xl border border-gray-800 space-y-6">
+      
+      <!-- Logo & Header -->
+      <div class="text-center space-y-2">
+        <div class="w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-3xl mx-auto flex items-center justify-center shadow-inner">
+          🛡️
         </div>
+        <h2 class="text-xl font-bold text-white tracking-tight">Tuna AI Admin Portal</h2>
+        <p class="text-xs text-gray-400">Uganda Clinical Decision Support • Restricted Access</p>
       </div>
-      <div class="glass-card rounded-xl p-5">
-        <div class="text-gray-400 text-xs font-semibold uppercase tracking-wider">Knowledge Chunks</div>
-        <div class="text-2xl font-bold text-emerald-400 mt-1" id="statChunks">--</div>
-        <div class="text-xs text-gray-500 mt-2">Supabase pgvector</div>
-      </div>
-      <div class="glass-card rounded-xl p-5">
-        <div class="text-gray-400 text-xs font-semibold uppercase tracking-wider">Health Workers</div>
-        <div class="text-2xl font-bold text-white mt-1" id="statUsers">--</div>
-        <div class="text-xs text-gray-500 mt-2">Registered WhatsApp Users</div>
-      </div>
-      <div class="glass-card rounded-xl p-5">
-        <div class="text-gray-400 text-xs font-semibold uppercase tracking-wider">Diagnostics Active</div>
-        <div class="text-xl font-bold text-white mt-1">Text + Lab & Scan Vision</div>
-        <div class="text-xs text-emerald-400 mt-2">Groq Llama-3.2-Vision</div>
-      </div>
-    </div>
 
-    <!-- Main Grid -->
-    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-
-      <!-- Upload Guidelines Form (5 cols) -->
-      <div class="lg:col-span-5 glass-card rounded-xl p-6 space-y-5">
+      <!-- Login Form -->
+      <form id="adminLoginForm" class="space-y-4" onsubmit="handleLoginSubmit(event)">
         <div>
-          <h2 class="text-base font-bold text-white flex items-center gap-2">
-            <i class="fa-solid fa-file-arrow-up text-emerald-400"></i> Upload Clinical Guidelines
-          </h2>
-          <p class="text-xs text-gray-400 mt-1">
-            Upload Uganda Clinical Guidelines 2023, National Malaria Guidelines, or ART protocols. PDFs are processed in browser and saved in real-time batches.
-          </p>
-        </div>
-
-        <form id="uploadForm" class="space-y-4">
-          <div>
-            <label class="block text-xs font-medium text-gray-300 mb-1">Document Title</label>
-            <input type="text" id="docTitle" required placeholder="e.g. Uganda Clinical Guidelines 2023"
-                   value="Uganda Clinical Guidelines 2023"
-                   class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-xs text-white focus:border-emerald-500 outline-none">
-          </div>
-
-          <div>
-            <label class="block text-xs font-medium text-gray-300 mb-1">Edition / Ministry Year</label>
-            <input type="text" id="docEdition" placeholder="e.g. 2023 Ministry of Health Edition"
-                   value="2023 MoH Edition"
-                   class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-xs text-white focus:border-emerald-500 outline-none">
-          </div>
-
-          <div>
-            <label class="block text-xs font-medium text-gray-300 mb-1">Target Audience / Material Type</label>
-            <select id="docType" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-xs text-white focus:border-emerald-500 outline-none">
-              <option value="professional">Professional Guidelines (Doctors, Nurses, Clinical Officers)</option>
-              <option value="student">Student Learning Material (Medical & Nursing Learners)</option>
-            </select>
-          </div>
-
-          <div>
-            <label class="block text-xs font-medium text-gray-300 mb-1">Select PDF Guidelines File</label>
-            <div id="dropZone" class="border-2 border-dashed border-gray-700 hover:border-emerald-500/60 rounded-xl p-6 text-center cursor-pointer transition bg-gray-900/50">
-              <i class="fa-solid fa-file-pdf text-3xl text-emerald-400/80 mb-2"></i>
-              <div class="text-xs text-gray-300 font-medium" id="fileNameLabel">Click to browse or drop PDF here</div>
-              <p class="text-[10px] text-gray-500 mt-1">PDF guidelines of any size (browser streaming)</p>
-              <input type="file" id="pdfFileInput" accept=".pdf" class="hidden">
-            </div>
-          </div>
-
-          <!-- Progress Bar Container -->
-          <div id="uploadProgressContainer" class="hidden space-y-2">
-            <div class="flex justify-between text-xs text-gray-400">
-              <span id="uploadStatusText">Extracting PDF pages in browser...</span>
-              <span id="uploadPercent">0%</span>
-            </div>
-            <div class="w-full bg-gray-800 rounded-full h-2 overflow-hidden">
-              <div id="uploadProgressBar" class="bg-emerald-500 h-2 transition-all duration-300" style="width: 0%"></div>
-            </div>
-          </div>
-
-          <button type="submit" id="submitBtn" class="w-full btn-emerald text-white font-semibold py-2.5 px-4 rounded-lg text-xs flex items-center justify-center gap-2">
-            <i class="fa-solid fa-bolt"></i> Ingest into Knowledge Base
-          </button>
-        </form>
-
-        <div id="alertBox" class="hidden text-xs p-3 rounded-lg"></div>
-
-        <!-- Recent Mobile Money Transactions -->
-        <div class="pt-4 border-t border-gray-800">
-          <h3 class="text-xs font-bold text-white uppercase tracking-wider mb-2 flex items-center gap-1.5">
-            <i class="fa-solid fa-money-bill-transfer text-emerald-400"></i> Recent PesaPal UGX Payments
-          </h3>
-          <div id="ordersList" class="space-y-1.5 text-[11px] text-gray-400">
-            <div>Loading recent mobile money transactions...</div>
-          </div>
-        </div>
-
-      </div>
-
-      <!-- Right Column: Document Explorer & Diagnostic Test Bench (7 cols) -->
-      <div class="lg:col-span-7 space-y-6">
-
-        <!-- Indexed Knowledge Documents Table -->
-        <div class="glass-card rounded-xl p-6">
-          <div class="flex items-center justify-between mb-4">
-            <h2 class="text-base font-bold text-white flex items-center gap-2">
-              <i class="fa-solid fa-book-bookmark text-emerald-400"></i> Indexed Source Guidelines
-            </h2>
-            <button onclick="loadStats()" class="text-xs text-gray-400 hover:text-white px-2 py-1 rounded bg-gray-800 border border-gray-700">
-              <i class="fa-solid fa-rotate-right"></i> Refresh
+          <label class="block text-xs font-semibold text-gray-300 mb-1.5 uppercase tracking-wider">Admin Secret Key</label>
+          <div class="relative">
+            <input type="password" id="loginKeyInput" required placeholder="Enter administrative key"
+                   autocomplete="current-password"
+                   class="w-full bg-gray-900/90 border border-gray-700 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-500 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none transition pr-10">
+            <button type="button" onclick="togglePasswordVisibility()" class="absolute right-3 top-3.5 text-gray-400 hover:text-gray-200 text-xs">
+              <i id="eyeIcon" class="fa-solid fa-eye"></i>
             </button>
           </div>
+        </div>
 
-          <div class="overflow-x-auto">
-            <table class="w-full text-left text-xs text-gray-300">
+        <div class="flex items-center justify-between text-xs">
+          <label class="flex items-center gap-2 text-gray-400 cursor-pointer select-none">
+            <input type="checkbox" id="rememberMeCheckbox" class="rounded bg-gray-900 border-gray-700 text-emerald-500 focus:ring-0">
+            Remember this session
+          </label>
+        </div>
+
+        <button type="submit" id="loginBtn" class="w-full btn-emerald text-white font-bold py-3.5 px-4 rounded-xl text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/40 cursor-pointer">
+          <i class="fa-solid fa-right-to-bracket text-base"></i> Log In to Admin Panel
+        </button>
+      </form>
+
+      <!-- Alert Banner inside Login -->
+      <div id="loginAlert" class="hidden text-xs p-3 rounded-xl border"></div>
+
+      <div class="text-center text-[11px] text-gray-500 pt-2 border-t border-gray-800/80">
+        Protected by Tuna AI Security Framework<br>Unauthorized administrative access is prohibited.
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════════ -->
+  <!--  AUTHENTICATED PORTAL (Hidden until validated)                  -->
+  <!-- ════════════════════════════════════════════════════════════════ -->
+  <div id="adminApp" class="hidden min-h-screen flex flex-col">
+
+    <!-- Top Navigation -->
+    <header class="border-b border-gray-800 bg-gray-900/90 sticky top-0 z-50 px-6 py-4 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-xl border border-emerald-500/40">
+          🩺
+        </div>
+        <div>
+          <h1 class="text-lg font-bold text-white flex items-center gap-2">
+            Tuna AI <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800">Uganda 🇺🇬</span>
+          </h1>
+          <p class="text-xs text-gray-400">Clinical Guidelines &amp; Diagnostic Intelligence Admin Portal</p>
+        </div>
+      </div>
+      <div class="flex items-center space-x-4">
+        <div class="text-right hidden sm:block">
+          <span class="text-xs text-gray-500 block">AI Infrastructure</span>
+          <span class="text-xs font-semibold text-emerald-400 flex items-center gap-1">
+            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Groq Cloud + Supabase
+          </span>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="text-xs px-2.5 py-1 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800 flex items-center gap-1.5 font-medium">
+            <i class="fa-solid fa-shield-halved text-[10px]"></i> Authorized
+          </span>
+          <button onclick="logoutAdmin()" class="bg-gray-800 hover:bg-red-950 hover:text-red-300 hover:border-red-800 border border-gray-700 text-gray-300 text-xs px-3 py-1.5 rounded-lg font-medium transition flex items-center gap-1.5">
+            <i class="fa-solid fa-arrow-right-from-bracket"></i> Logout
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main class="flex-1 max-w-7xl w-full mx-auto p-6 space-y-6">
+
+      <!-- KPI Metric Cards -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="glass-card rounded-xl p-5 col-span-2 md:col-span-1">
+          <div class="text-gray-400 text-xs font-semibold uppercase tracking-wider">Clinical Framework</div>
+          <div class="text-lg font-bold text-white mt-1">Uganda Clinical Guidelines</div>
+          <div class="text-xs text-emerald-400 mt-2 flex items-center gap-1">
+            <i class="fa-solid fa-shield-halved"></i> UCG Strict Protocol
+          </div>
+        </div>
+        <div class="glass-card rounded-xl p-5">
+          <div class="text-gray-400 text-xs font-semibold uppercase tracking-wider">Knowledge Chunks</div>
+          <div class="text-2xl font-bold text-emerald-400 mt-1" id="statChunks">--</div>
+          <div class="text-xs text-gray-500 mt-2">Supabase pgvector</div>
+        </div>
+        <div class="glass-card rounded-xl p-5">
+          <div class="text-gray-400 text-xs font-semibold uppercase tracking-wider">Registered Users</div>
+          <div class="text-2xl font-bold text-white mt-1" id="statUsers">--</div>
+          <div class="text-xs text-gray-500 mt-2">Active WhatsApp Accounts</div>
+        </div>
+        <div class="glass-card rounded-xl p-5">
+          <div class="text-gray-400 text-xs font-semibold uppercase tracking-wider">Diagnostics Active</div>
+          <div class="text-lg font-bold text-white mt-1">Text + Lab &amp; Scan Vision</div>
+          <div class="text-xs text-emerald-400 mt-2">Groq Llama-3.2-Vision</div>
+        </div>
+      </div>
+
+      <!-- ── Tab Navigation ── -->
+      <div class="glass-card rounded-xl overflow-hidden">
+        <div class="flex border-b border-gray-800 px-4 pt-2 gap-1 bg-gray-900/50">
+          <button class="tab-btn active px-5 py-3 text-sm font-semibold" data-tab="knowledge">
+            <i class="fa-solid fa-book-medical mr-2"></i>Knowledge Base
+          </button>
+          <button class="tab-btn px-5 py-3 text-sm font-semibold" data-tab="users">
+            <i class="fa-solid fa-users mr-2"></i>Users
+          </button>
+          <button class="tab-btn px-5 py-3 text-sm font-semibold" data-tab="whatsapp">
+            <i class="fa-brands fa-whatsapp mr-2"></i>WhatsApp Gateway
+          </button>
+        </div>
+
+        <!-- ════════════════════════════════════════════════════════ -->
+        <!--  TAB 1 · KNOWLEDGE BASE                                 -->
+        <!-- ════════════════════════════════════════════════════════ -->
+        <div id="tab-knowledge" class="tab-panel active p-6">
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+            <!-- Upload Guidelines Form (5 cols) -->
+            <div class="lg:col-span-5 space-y-5">
+              <div>
+                <h2 class="text-base font-bold text-white flex items-center gap-2">
+                  <i class="fa-solid fa-file-arrow-up text-emerald-400"></i> Upload Clinical Guidelines
+                </h2>
+                <p class="text-xs text-gray-400 mt-1">
+                  Upload Uganda Clinical Guidelines 2023, National Malaria Guidelines, or ART protocols. PDFs are processed in browser and saved in real-time batches.
+                </p>
+              </div>
+
+              <form id="uploadForm" class="space-y-4">
+                <div>
+                  <label class="block text-xs font-medium text-gray-300 mb-1">Document Title</label>
+                  <input type="text" id="docTitle" required placeholder="e.g. Uganda Clinical Guidelines 2023"
+                         value="Uganda Clinical Guidelines 2023"
+                         class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-xs text-white focus:border-emerald-500 outline-none">
+                </div>
+
+                <div>
+                  <label class="block text-xs font-medium text-gray-300 mb-1">Edition / Ministry Year</label>
+                  <input type="text" id="docEdition" placeholder="e.g. 2023 Ministry of Health Edition"
+                         value="2023 MoH Edition"
+                         class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-xs text-white focus:border-emerald-500 outline-none">
+                </div>
+
+                <div>
+                  <label class="block text-xs font-medium text-gray-300 mb-1">Target Audience / Material Type</label>
+                  <select id="docType" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-xs text-white focus:border-emerald-500 outline-none">
+                    <option value="professional">Professional Guidelines (Doctors, Nurses, Clinical Officers)</option>
+                    <option value="student">Student Learning Material (Medical &amp; Nursing Learners)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label class="block text-xs font-medium text-gray-300 mb-1">Select PDF Guidelines File</label>
+                  <div id="dropZone" class="border-2 border-dashed border-gray-700 hover:border-emerald-500/60 rounded-xl p-6 text-center cursor-pointer transition bg-gray-900/50">
+                    <i class="fa-solid fa-file-pdf text-3xl text-emerald-400/80 mb-2"></i>
+                    <div class="text-xs text-gray-300 font-medium" id="fileNameLabel">Click to browse or drop PDF here</div>
+                    <p class="text-[10px] text-gray-500 mt-1">PDF guidelines of any size (browser streaming)</p>
+                    <input type="file" id="pdfFileInput" accept=".pdf" class="hidden">
+                  </div>
+                </div>
+
+                <!-- Progress Bar Container -->
+                <div id="uploadProgressContainer" class="hidden space-y-2">
+                  <div class="flex justify-between text-xs text-gray-400">
+                    <span id="uploadStatusText">Extracting PDF pages in browser...</span>
+                    <span id="uploadPercent">0%</span>
+                  </div>
+                  <div class="w-full bg-gray-800 rounded-full h-2 overflow-hidden">
+                    <div id="uploadProgressBar" class="bg-emerald-500 h-2 transition-all duration-300" style="width: 0%"></div>
+                  </div>
+                </div>
+
+                <button type="submit" id="submitBtn" class="w-full btn-emerald text-white font-semibold py-2.5 px-4 rounded-lg text-xs flex items-center justify-center gap-2">
+                  <i class="fa-solid fa-bolt"></i> Ingest into Knowledge Base
+                </button>
+              </form>
+
+              <div id="alertBox" class="hidden text-xs p-3 rounded-lg"></div>
+            </div>
+
+            <!-- Right Column: Document Explorer & Diagnostic Test Bench (7 cols) -->
+            <div class="lg:col-span-7 space-y-6">
+
+              <!-- Indexed Knowledge Documents Table -->
+              <div class="space-y-4">
+                <div class="flex items-center justify-between">
+                  <h2 class="text-base font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-book-bookmark text-emerald-400"></i> Indexed Source Guidelines
+                  </h2>
+                  <button onclick="loadStats()" class="text-xs text-gray-400 hover:text-white px-2 py-1 rounded bg-gray-800 border border-gray-700">
+                    <i class="fa-solid fa-rotate-right"></i> Refresh
+                  </button>
+                </div>
+
+                <div class="overflow-x-auto">
+                  <table class="w-full text-left text-xs text-gray-300">
+                    <thead class="text-[11px] uppercase bg-gray-900/80 text-gray-400 border-b border-gray-800">
+                      <tr>
+                        <th class="py-2.5 px-3">Document Title</th>
+                        <th class="py-2.5 px-3">Edition</th>
+                        <th class="py-2.5 px-3 text-center">Vector Chunks</th>
+                      </tr>
+                    </thead>
+                    <tbody id="docsTableBody" class="divide-y divide-gray-800">
+                      <tr>
+                        <td colspan="3" class="py-6 text-center text-gray-500">Loading indexed guidelines...</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- Live Diagnostic Testing Sandbox -->
+              <div class="pt-4 border-t border-gray-800 space-y-3">
+                <h3 class="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                  <i class="fa-solid fa-stethoscope text-emerald-400"></i> UCG Diagnostic Verification Sandbox
+                </h3>
+                <div class="flex gap-2">
+                  <input type="text" id="sandboxPrompt" placeholder="e.g. Management of severe pre-eclampsia at HC IV with magnesium sulfate dosage"
+                         class="flex-1 bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-xs text-white focus:border-emerald-500 outline-none">
+                  <button onclick="testSandbox()" id="sandboxBtn" class="btn-emerald text-white text-xs px-4 py-2 rounded-lg font-medium">
+                    Run Test
+                  </button>
+                </div>
+                <div id="sandboxOutput" class="hidden bg-gray-900/90 rounded-lg p-3 text-xs text-gray-200 border border-gray-800 max-h-56 overflow-y-auto whitespace-pre-wrap font-sans"></div>
+              </div>
+
+            </div>
+
+          </div>
+        </div><!-- /tab-knowledge -->
+
+        <!-- ════════════════════════════════════════════════════════ -->
+        <!--  TAB 2 · USERS                                          -->
+        <!-- ════════════════════════════════════════════════════════ -->
+        <div id="tab-users" class="tab-panel p-6 space-y-4">
+          <div class="flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
+            <h2 class="text-base font-bold text-white flex items-center gap-2">
+              <i class="fa-solid fa-users text-emerald-400"></i> Registered Users
+              <span id="usersCountBadge" class="text-xs px-2 py-0.5 rounded-full bg-gray-800 text-gray-400 border border-gray-700">0</span>
+            </h2>
+            <div class="flex gap-2 flex-wrap">
+              <input type="text" id="userSearchInput" placeholder="Search name or WhatsApp…"
+                     class="bg-gray-900 border border-gray-700 rounded-lg pl-3 pr-3 py-1.5 text-xs text-white focus:border-emerald-500 outline-none w-52">
+              <select id="userRoleFilter"
+                      class="bg-gray-900 border border-gray-700 rounded-lg px-3 py-1.5 text-xs text-white focus:border-emerald-500 outline-none">
+                <option value="">All Roles</option>
+                <option value="professional">Professional</option>
+                <option value="student">Student</option>
+              </select>
+              <button onclick="loadUsers()" class="btn-emerald text-white text-xs font-semibold px-4 py-1.5 rounded-lg flex items-center gap-1.5">
+                <i class="fa-solid fa-rotate-right"></i> Refresh
+              </button>
+            </div>
+          </div>
+
+          <div id="usersAlert" class="hidden text-xs p-3 rounded-lg"></div>
+
+          <div class="overflow-x-auto rounded-xl border border-gray-800">
+            <table class="w-full text-left text-xs text-gray-300 min-w-[800px]">
               <thead class="text-[11px] uppercase bg-gray-900/80 text-gray-400 border-b border-gray-800">
                 <tr>
-                  <th class="py-2.5 px-3">Document Title</th>
-                  <th class="py-2.5 px-3">Edition</th>
-                  <th class="py-2.5 px-3 text-center">Vector Chunks</th>
+                  <th class="py-3 px-4">Name</th>
+                  <th class="py-3 px-4">WhatsApp ID</th>
+                  <th class="py-3 px-4">Profession</th>
+                  <th class="py-3 px-4">Role</th>
+                  <th class="py-3 px-4">Practicing #</th>
+                  <th class="py-3 px-4 text-center">Credits</th>
+                  <th class="py-3 px-4 text-center">Status</th>
+                  <th class="py-3 px-4">Registered</th>
                 </tr>
               </thead>
-              <tbody id="docsTableBody" class="divide-y divide-gray-800">
+              <tbody id="usersTableBody" class="divide-y divide-gray-800">
                 <tr>
-                  <td colspan="3" class="py-6 text-center text-gray-500">Loading indexed guidelines...</td>
+                  <td colspan="8" class="py-10 text-center text-gray-500">Click Refresh to load registered health workers</td>
                 </tr>
               </tbody>
             </table>
           </div>
-        </div>
+        </div><!-- /tab-users -->
 
-        <!-- Live Diagnostic Testing Sandbox -->
-        <div class="glass-card rounded-xl p-6 space-y-4">
-          <h2 class="text-base font-bold text-white flex items-center gap-2">
-            <i class="fa-solid fa-stethoscope text-emerald-400"></i> UCG Diagnostic Verification Sandbox
-          </h2>
-          <p class="text-xs text-gray-400">
-            Test clinical prompts or paste lab values to verify treatment steps and exact dosages under Uganda Clinical Guidelines.
-          </p>
-
-          <div class="flex gap-2">
-            <input type="text" id="sandboxPrompt" placeholder="e.g. Management of severe pre-eclampsia at HC IV with magnesium sulfate dosage"
-                   class="flex-1 bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-xs text-white focus:border-emerald-500 outline-none">
-            <button onclick="testSandbox()" id="sandboxBtn" class="btn-emerald text-white text-xs px-4 py-2 rounded-lg font-medium">
-              Run Test
-            </button>
+        <!-- ════════════════════════════════════════════════════════ -->
+        <!--  TAB 3 · WHATSAPP GATEWAY                               -->
+        <!-- ════════════════════════════════════════════════════════ -->
+        <div id="tab-whatsapp" class="tab-panel p-6 space-y-4">
+          <div class="flex items-center justify-between">
+            <h2 class="text-base font-bold text-white flex items-center gap-2">
+              <i class="fa-brands fa-whatsapp text-emerald-400"></i> WhatsApp Gateway Connection
+            </h2>
+            <span id="waStatusBadge" class="text-xs px-3 py-1 rounded-full bg-gray-800 border border-gray-700 text-gray-400">● Disconnected</span>
           </div>
 
-          <div id="sandboxOutput" class="hidden bg-gray-900/90 rounded-lg p-4 text-xs text-gray-200 border border-gray-800 max-h-64 overflow-y-auto whitespace-pre-wrap"></div>
-        </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="flex items-center justify-center bg-gray-900/80 rounded-xl border border-gray-800 min-h-[280px] p-4">
+              <div id="qrSpinner" class="text-center space-y-2">
+                <i class="fa-solid fa-spinner fa-spin text-2xl text-emerald-400"></i>
+                <p class="text-xs text-gray-400">Click "Load QR Code" to start</p>
+              </div>
+              <img id="qrImage" class="hidden max-w-[256px] rounded-lg" alt="WhatsApp QR Code">
+              <div id="qrOnlineMsg" class="hidden text-center space-y-2">
+                <i class="fa-solid fa-circle-check text-4xl text-emerald-400"></i>
+                <p class="text-sm text-emerald-300 font-semibold">WhatsApp Connected!</p>
+              </div>
+            </div>
 
-      </div>
-
-    </div>
-
-    <!-- WhatsApp Gateway Connection Panel -->
-    <div class="glass-card rounded-xl p-6 space-y-4">
-      <div class="flex items-center justify-between">
-        <h2 class="text-base font-bold text-white flex items-center gap-2">
-          <i class="fa-brands fa-whatsapp text-emerald-400"></i> WhatsApp Gateway Connection
-        </h2>
-        <span id="waStatusBadge" class="text-xs px-3 py-1 rounded-full bg-gray-800 border border-gray-700 text-gray-400">● Disconnected</span>
-      </div>
-      <p class="text-xs text-gray-400">
-        Connect your WhatsApp number to the Tuna AI bot by scanning the QR code below. The gateway runs on Railway.
-      </p>
-
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <!-- QR Display -->
-        <div class="flex items-center justify-center bg-gray-900/80 rounded-xl border border-gray-800 min-h-[280px] p-4">
-          <div id="qrSpinner" class="text-center space-y-2">
-            <i class="fa-solid fa-spinner fa-spin text-2xl text-emerald-400"></i>
-            <p class="text-xs text-gray-400">Click "Load QR Code" to start</p>
+            <div class="space-y-3">
+              <div>
+                <label class="block text-xs font-medium text-gray-300 mb-1">Gateway Worker URL</label>
+                <input type="text" id="gatewayUrl" placeholder="https://your-railway-app.railway.app"
+                       class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-xs text-white focus:border-emerald-500 outline-none">
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-300 mb-1">Gateway Secret Key</label>
+                <input type="password" id="gatewaySecret" placeholder="Internal gateway secret"
+                       class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-xs text-white focus:border-emerald-500 outline-none">
+              </div>
+              <button onclick="loadQR()" class="w-full btn-emerald text-white font-semibold py-2.5 px-4 rounded-lg text-xs flex items-center justify-center gap-2">
+                <i class="fa-solid fa-qrcode"></i> Load QR Code
+              </button>
+              <button onclick="resetGatewaySession()" class="w-full bg-red-950 hover:bg-red-900 text-red-300 border border-red-800 font-medium py-2 px-4 rounded-lg text-xs flex items-center justify-center gap-2 transition">
+                <i class="fa-solid fa-rotate"></i> Reset Session &amp; Re-pair
+              </button>
+              <div id="gatewayAlertBox" class="hidden text-xs p-3 rounded-lg"></div>
+            </div>
           </div>
-          <img id="qrImage" class="hidden max-w-[256px] rounded-lg" alt="WhatsApp QR Code">
-          <div id="qrOnlineMsg" class="hidden text-center space-y-2">
-            <i class="fa-solid fa-circle-check text-4xl text-emerald-400"></i>
-            <p class="text-sm text-emerald-300 font-semibold">WhatsApp Connected!</p>
-            <p class="text-xs text-gray-400">Bot is online and receiving messages.</p>
-          </div>
-        </div>
+        </div><!-- /tab-whatsapp -->
 
-        <!-- Controls -->
-        <div class="space-y-3">
-          <div>
-            <label class="block text-xs font-medium text-gray-300 mb-1">Gateway Worker URL</label>
-            <input type="text" id="gatewayUrl" placeholder="https://tuna.up.railway.app"
-                   class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-xs text-white focus:border-emerald-500 outline-none">
-          </div>
-          <div>
-            <label class="block text-xs font-medium text-gray-300 mb-1">Gateway Secret</label>
-            <input type="password" id="gatewaySecret" placeholder="Internal gateway secret"
-                   class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-xs text-white focus:border-emerald-500 outline-none">
-          </div>
-          <button onclick="loadQR()" class="w-full btn-emerald text-white font-semibold py-2.5 px-4 rounded-lg text-xs flex items-center justify-center gap-2">
-            <i class="fa-solid fa-qrcode"></i> Load QR Code
-          </button>
-          <button onclick="resetGatewaySession()" class="w-full bg-red-950 hover:bg-red-900 text-red-300 border border-red-800 font-medium py-2 px-4 rounded-lg text-xs flex items-center justify-center gap-2 transition">
-            <i class="fa-solid fa-rotate"></i> Reset Session &amp; Re-pair
-          </button>
-          <p class="text-[10px] text-gray-500">
-            If the QR doesn't appear, ensure the Railway gateway is running and the <code>PHONE_NUMBER_FOR_PAIRING</code> env var is removed (QR mode requires it unset).
-          </p>
-          <div id="gatewayAlertBox" class="hidden text-xs p-3 rounded-lg"></div>
-        </div>
-      </div>
-    </div>
+      </div><!-- /glass-card -->
 
-  </main>
+    </main>
 
-  <footer class="border-t border-gray-800 px-6 py-4 text-center text-xs text-gray-500">
-    Tuna AI Medical Assistant • Dedicated to Uganda Ministry of Health Guidelines Decision Support • Deployed via Vercel & Railway
-  </footer>
+    <footer class="border-t border-gray-800 px-6 py-4 text-center text-xs text-gray-500">
+      Tuna AI Medical Assistant • Dedicated to Uganda Ministry of Health Guidelines Decision Support • Deployed via Vercel &amp; Railway
+    </footer>
+
+  </div><!-- /adminApp -->
 
   <script>
     // Configure PDF.js worker
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
+    // ── Authentication Management ─────────────────────────────────────
+    function getAdminSecret() {
+      return sessionStorage.getItem('tuna_admin_secret') ||
+             localStorage.getItem('tuna_admin_secret') ||
+             '';
+    }
+
+    function togglePasswordVisibility() {
+      const input = document.getElementById('loginKeyInput');
+      const icon = document.getElementById('eyeIcon');
+      if (input.type === 'password') {
+        input.type = 'text';
+        icon.className = 'fa-solid fa-eye-slash';
+      } else {
+        input.type = 'password';
+        icon.className = 'fa-solid fa-eye';
+      }
+    }
+
+    async function handleLoginSubmit(e) {
+      e.preventDefault();
+      const keyInput = document.getElementById('loginKeyInput');
+      const rememberMe = document.getElementById('rememberMeCheckbox').checked;
+      const secret = keyInput.value.trim();
+      const loginBtn = document.getElementById('loginBtn');
+      const loginAlert = document.getElementById('loginAlert');
+
+      if (!secret) return;
+
+      loginBtn.disabled = true;
+      loginBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-xs"></i> Verifying Credentials...';
+      loginAlert.classList.add('hidden');
+
+      try {
+        const res = await fetch('/api/v1/admin/verify-auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ secret })
+        });
+
+        if (res.ok) {
+          sessionStorage.setItem('tuna_admin_secret', secret);
+          if (rememberMe) {
+            localStorage.setItem('tuna_admin_secret', secret);
+          } else {
+            localStorage.removeItem('tuna_admin_secret');
+          }
+          unlockDashboard();
+        } else {
+          showLoginAlert('❌ Invalid Admin Secret Key. Access Denied.', 'error');
+        }
+      } catch (err) {
+        showLoginAlert('❌ Network error connecting to security server.', 'error');
+      } finally {
+        loginBtn.disabled = false;
+        loginBtn.innerHTML = '<i class="fa-solid fa-right-to-bracket text-base"></i> Log In to Admin Panel';
+      }
+    }
+
+    function showLoginAlert(msg, type) {
+      const alert = document.getElementById('loginAlert');
+      alert.textContent = msg;
+      alert.className = type === 'error'
+        ? 'text-xs p-3 rounded-xl bg-red-950/80 text-red-300 border border-red-800'
+        : 'text-xs p-3 rounded-xl bg-emerald-950/80 text-emerald-300 border border-emerald-800';
+      alert.classList.remove('hidden');
+    }
+
+    function unlockDashboard() {
+      document.getElementById('loginGate').classList.add('hidden');
+      document.getElementById('adminApp').classList.remove('hidden');
+      loadStats();
+      loadUsers();
+      if (localStorage.getItem('tuna_gateway_url')) {
+        loadQR();
+      }
+    }
+
+    function logoutAdmin() {
+      sessionStorage.removeItem('tuna_admin_secret');
+      localStorage.removeItem('tuna_admin_secret');
+      document.getElementById('adminApp').classList.add('hidden');
+      document.getElementById('loginGate').classList.remove('hidden');
+      document.getElementById('loginKeyInput').value = '';
+      showLoginAlert('🔒 You have been securely logged out.', 'info');
+    }
+
+    function onAuthExpired() {
+      logoutAdmin();
+      showLoginAlert('⚠️ Admin session expired or invalid. Please sign in again.', 'error');
+    }
+
+    async function checkExistingSession() {
+      const secret = getAdminSecret();
+      if (!secret) {
+        document.getElementById('loginGate').classList.remove('hidden');
+        document.getElementById('adminApp').classList.add('hidden');
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/v1/admin/verify-auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ secret })
+        });
+        if (res.ok) {
+          unlockDashboard();
+        } else {
+          sessionStorage.removeItem('tuna_admin_secret');
+          localStorage.removeItem('tuna_admin_secret');
+          document.getElementById('loginGate').classList.remove('hidden');
+          document.getElementById('adminApp').classList.add('hidden');
+        }
+      } catch (err) {
+        document.getElementById('loginGate').classList.remove('hidden');
+        document.getElementById('adminApp').classList.add('hidden');
+      }
+    }
+
+    // ── Tab Navigation ────────────────────────────────────────────────
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const tab = btn.dataset.tab;
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById('tab-' + tab).classList.add('active');
+      });
+    });
+
+    // ── Document Ingestion ───────────────────────────────────────────
     const fileInput = document.getElementById('pdfFileInput');
     const dropZone = document.getElementById('dropZone');
     const fileNameLabel = document.getElementById('fileNameLabel');
@@ -296,7 +561,6 @@
       }
     });
 
-    // Ingest Handler: Extracts PDF in-browser and streams small batches to Vercel
     uploadForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       if (!fileInput.files || fileInput.files.length === 0) {
@@ -345,13 +609,11 @@
             }
           }
 
-          // Update progress
           const progress = Math.round((pageNum / totalPages) * 85);
           progressBar.style.width = `${progress}%`;
           percentText.textContent = `${progress}%`;
           statusText.textContent = `Page ${pageNum} of ${totalPages} (Saved: ${totalChunksSent} chunks)...`;
 
-          // Stream batches of 25 chunks (small ~15 KB payloads well under Vercel limits)
           if (pendingChunks.length >= 25) {
             await sendBatch(title, edition, docType, pendingChunks);
             totalChunksSent += pendingChunks.length;
@@ -359,7 +621,6 @@
           }
         }
 
-        // Send final remaining chunks
         if (pendingChunks.length > 0) {
           await sendBatch(title, edition, docType, pendingChunks);
           totalChunksSent += pendingChunks.length;
@@ -383,11 +644,16 @@
     });
 
     async function sendBatch(title, edition, docType, chunks) {
+      const secret = getAdminSecret();
       const res = await fetch('/api/ingest-chunks', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-secret': secret
+        },
         body: JSON.stringify({ title, edition, doc_type: docType, chunks })
       });
+      if (res.status === 401) { onAuthExpired(); return; }
       if (!res.ok) {
         const errorText = await res.text();
         throw new Error(`Server error (${res.status}): ${errorText}`);
@@ -403,8 +669,14 @@
     }
 
     async function loadStats() {
+      const secret = getAdminSecret();
+      if (!secret) return;
+
       try {
-        const res = await fetch('/api/admin-stats');
+        const res = await fetch('/api/admin-stats', {
+          headers: { 'x-admin-secret': secret }
+        });
+        if (res.status === 401) { onAuthExpired(); return; }
         const data = await res.json();
 
         document.getElementById('statChunks').textContent = data.total_chunks || 0;
@@ -426,30 +698,83 @@
             tbody.appendChild(tr);
           });
         }
-
-        const ordersList = document.getElementById('ordersList');
-        ordersList.innerHTML = '';
-        if (!data.recent_orders || data.recent_orders.length === 0) {
-          ordersList.innerHTML = '<div class="text-gray-500">No transactions recorded yet.</div>';
-        } else {
-          data.recent_orders.forEach(o => {
-            const div = document.createElement('div');
-            div.className = 'flex items-center justify-between p-2 rounded bg-gray-900 border border-gray-800';
-            div.innerHTML = `
-              <div>
-                <span class="font-semibold text-white">${Number(o.amount_paid).toLocaleString()} UGX</span>
-                <span class="text-gray-500 text-[10px]">(${o.credits_to_grant} Credits)</span>
-              </div>
-              <span class="px-2 py-0.5 rounded text-[10px] ${o.status === 'COMPLETED' ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : 'bg-amber-950 text-amber-400 border border-amber-800'}">${o.status}</span>
-            `;
-            ordersList.appendChild(div);
-          });
-        }
       } catch (e) {
         console.error(e);
       }
     }
 
+    // ── Users Management ─────────────────────────────────────────────
+    let allUsers = [];
+
+    async function loadUsers() {
+      const secret = getAdminSecret();
+      if (!secret) return;
+
+      try {
+        const res = await fetch('/api/v1/admin/users', {
+          headers: { 'x-admin-secret': secret }
+        });
+        if (res.status === 401) { onAuthExpired(); return; }
+        const data = await res.json();
+        allUsers = Array.isArray(data) ? data : (data.users || []);
+        renderUsersTable(allUsers);
+      } catch (err) {
+        console.error('Failed to load users:', err);
+      }
+    }
+
+    function renderUsersTable(users) {
+      const tbody = document.getElementById('usersTableBody');
+      if (!users || users.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="py-10 text-center text-gray-500">No registered users found.</td></tr>';
+        document.getElementById('usersCountBadge').textContent = 0;
+        return;
+      }
+      document.getElementById('usersCountBadge').textContent = users.length;
+      tbody.innerHTML = '';
+      users.forEach((u, idx) => {
+        const role = (u.role || '').toLowerCase();
+        const roleBadge = role === 'student'
+          ? '<span class="text-[11px] px-2 py-0.5 rounded-full badge-student">Student</span>'
+          : '<span class="text-[11px] px-2 py-0.5 rounded-full badge-professional">Professional</span>';
+        const active = u.status !== 'suspended';
+        const statusBadge = active
+          ? '<span class="text-[11px] px-2 py-0.5 rounded-full bg-emerald-950/60 text-emerald-400 border border-emerald-800">Active</span>'
+          : '<span class="text-[11px] px-2 py-0.5 rounded-full bg-red-950/60 text-red-400 border border-red-900">Suspended</span>';
+
+        const tr = document.createElement('tr');
+        tr.className = 'user-row divide-x divide-gray-800/40 ' + (idx % 2 === 0 ? 'bg-gray-900/20' : '');
+        tr.innerHTML = `
+          <td class="py-3 px-4 font-medium text-white whitespace-nowrap">${u.name || '—'}</td>
+          <td class="py-3 px-4 text-gray-300 whitespace-nowrap">${u.whatsapp_id || '—'}</td>
+          <td class="py-3 px-4 text-gray-300">${u.profession || '—'}</td>
+          <td class="py-3 px-4">${roleBadge}</td>
+          <td class="py-3 px-4 text-gray-300">${u.practicing_number || '—'}</td>
+          <td class="py-3 px-4 text-center font-semibold text-emerald-400">${u.credit_balance ?? '—'}</td>
+          <td class="py-3 px-4 text-center">${statusBadge}</td>
+          <td class="py-3 px-4 text-gray-400 whitespace-nowrap">${u.created_at ? new Date(u.created_at).toLocaleDateString('en-UG') : '—'}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function filterUsers() {
+      const q = document.getElementById('userSearchInput').value.toLowerCase();
+      const role = document.getElementById('userRoleFilter').value.toLowerCase();
+      const filtered = allUsers.filter(u => {
+        const name = (u.name || '').toLowerCase();
+        const phone = (u.whatsapp_id || '').toLowerCase();
+        const uRole = (u.role || '').toLowerCase();
+        const matchQ = !q || name.includes(q) || phone.includes(q);
+        const matchR = !role || uRole === role;
+        return matchQ && matchR;
+      });
+      renderUsersTable(filtered);
+    }
+    document.getElementById('userSearchInput').addEventListener('input', filterUsers);
+    document.getElementById('userRoleFilter').addEventListener('change', filterUsers);
+
+    // ── Diagnostic Sandbox ───────────────────────────────────────────
     async function testSandbox() {
       const prompt = document.getElementById('sandboxPrompt').value.trim();
       if (!prompt) return;
@@ -478,18 +803,11 @@
       }
     }
 
-    // ── WhatsApp QR Panel ─────────────────────────────────────────────
+    // ── WhatsApp Gateway Panel ────────────────────────────────────────
     let qrPollInterval = null;
-
-    // Persist gateway settings in localStorage
-    const savedGwUrl = localStorage.getItem('tuna_gateway_url');
-    const savedGwSecret = localStorage.getItem('tuna_gateway_secret');
-    if (savedGwUrl) document.getElementById('gatewayUrl').value = savedGwUrl;
-    if (savedGwSecret) document.getElementById('gatewaySecret').value = savedGwSecret;
-
     function getGatewayConfig() {
       const url = document.getElementById('gatewayUrl').value.trim().replace(/\/$/, '');
-      const secret = document.getElementById('gatewaySecret').value.trim() || '';
+      const secret = document.getElementById('gatewaySecret').value.trim() || 'tuna-ai-uganda-secret-2026';
       localStorage.setItem('tuna_gateway_url', url);
       localStorage.setItem('tuna_gateway_secret', secret);
       return { url, secret };
@@ -505,26 +823,22 @@
         badge.textContent = '● Scan QR Code';
       } else {
         badge.className = 'text-xs px-3 py-1 rounded-full bg-gray-800 border border-gray-700 text-gray-400';
-        badge.textContent = '● Waiting...';
+        badge.textContent = '● Disconnected';
       }
     }
 
     async function fetchQR() {
       const { url, secret } = getGatewayConfig();
       if (!url) return;
-
       const qrImage = document.getElementById('qrImage');
       const qrSpinner = document.getElementById('qrSpinner');
       const qrOnlineMsg = document.getElementById('qrOnlineMsg');
-
       try {
         const res = await fetch(`${url}/api/v1/internal/qr?secret=${encodeURIComponent(secret)}`);
         const contentType = res.headers.get('content-type') || '';
-
-        if (contentType.includes('image/png')) {
+        if (contentType.includes('image/png') || contentType.includes('image/')) {
           const blob = await res.blob();
-          const objUrl = URL.createObjectURL(blob);
-          qrImage.src = objUrl;
+          qrImage.src = URL.createObjectURL(blob);
           qrImage.classList.remove('hidden');
           qrSpinner.classList.add('hidden');
           qrOnlineMsg.classList.add('hidden');
@@ -538,7 +852,6 @@
             setWaStatus('online');
             clearInterval(qrPollInterval);
           } else {
-            qrSpinner.querySelector('p').textContent = data.message || 'Waiting for QR...';
             qrSpinner.classList.remove('hidden');
             qrImage.classList.add('hidden');
             qrOnlineMsg.classList.add('hidden');
@@ -551,8 +864,6 @@
     }
 
     function loadQR() {
-      const { url } = getGatewayConfig();
-      if (!url) { showGatewayAlert('Please enter the Gateway Worker URL', 'error'); return; }
       clearInterval(qrPollInterval);
       fetchQR();
       qrPollInterval = setInterval(fetchQR, 5000);
@@ -560,9 +871,8 @@
 
     async function resetGatewaySession() {
       const { url, secret } = getGatewayConfig();
-      if (!url) { showGatewayAlert('Enter the Gateway URL first', 'error'); return; }
-      if (!confirm('Reset WhatsApp session? This will disconnect and generate a new QR code.')) return;
-      showGatewayAlert('Resetting session...', 'info');
+      if (!url) { showGatewayAlert('Enter Gateway URL first', 'error'); return; }
+      showGatewayAlert('Resetting session…', 'info');
       try {
         const res = await fetch(`${url}/api/v1/internal/reset-session`, {
           method: 'POST',
@@ -570,7 +880,7 @@
         });
         const data = await res.json();
         if (data.success) {
-          showGatewayAlert('Session reset! QR will appear in ~3 seconds...', 'success');
+          showGatewayAlert('Session reset! QR will appear shortly…', 'success');
           setTimeout(loadQR, 3500);
         } else {
           showGatewayAlert(data.error || 'Reset failed', 'error');
@@ -589,13 +899,10 @@
         ? 'text-xs p-3 rounded-lg bg-blue-950/80 text-blue-300 border border-blue-800'
         : 'text-xs p-3 rounded-lg bg-red-950/80 text-red-300 border border-red-800';
       box.classList.remove('hidden');
-      setTimeout(() => box.classList.add('hidden'), 8000);
     }
 
-    // Auto-load QR if gateway URL was previously saved
-    if (savedGwUrl) loadQR();
-
-    loadStats();
+    // ── Bootstrapping ────────────────────────────────────────────────
+    checkExistingSession();
   </script>
 </body>
 </html>

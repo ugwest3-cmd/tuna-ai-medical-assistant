@@ -78,8 +78,8 @@
           </label>
         </div>
 
-        <button type="submit" id="loginBtn" class="w-full btn-emerald text-white font-semibold py-3 px-4 rounded-xl text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/30">
-          <i class="fa-solid fa-lock text-xs"></i> Sign In to Portal
+        <button type="submit" id="loginBtn" class="w-full btn-emerald text-white font-bold py-3.5 px-4 rounded-xl text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/40 cursor-pointer">
+          <i class="fa-solid fa-right-to-bracket text-base"></i> Log In to Admin Panel
         </button>
       </form>
 
@@ -544,7 +544,7 @@
         showLoginAlert('❌ Network error connecting to security server.', 'error');
       } finally {
         loginBtn.disabled = false;
-        loginBtn.innerHTML = '<i class="fa-solid fa-lock text-xs"></i> Sign In to Portal';
+        loginBtn.innerHTML = '<i class="fa-solid fa-right-to-bracket text-base"></i> Log In to Admin Panel';
       }
     }
 
