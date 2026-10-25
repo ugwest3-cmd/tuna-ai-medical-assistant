@@ -10,7 +10,18 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 module.exports = async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-admin-secret');
+
+    if (req.method === 'OPTIONS') {
+        return res.status(200).end();
+    }
+
+    const adminSecret = req.headers['x-admin-secret'];
+    const expectedSecret = process.env.ADMIN_SECRET || 'tuna-admin-uganda-pass';
+    if (!adminSecret || adminSecret !== expectedSecret) {
+        return res.status(401).json({ error: 'Unauthorized: Invalid admin credentials' });
+    }
 
     try {
         const { count: totalChunks } = await supabase.from('medical_knowledge').select('*', { count: 'exact', head: true });

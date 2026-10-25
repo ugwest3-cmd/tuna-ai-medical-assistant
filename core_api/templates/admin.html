@@ -11,281 +11,692 @@
     .glass-card { background: rgba(22, 27, 34, 0.85); backdrop-filter: blur(12px); border: 1px solid rgba(48, 54, 61, 0.7); }
     .btn-emerald { background: linear-gradient(135deg, #10b981 0%, #059669 100%); transition: all 0.2s ease; }
     .btn-emerald:hover { filter: brightness(1.1); transform: translateY(-1px); }
+
+    /* Tab navigation */
+    .tab-btn { transition: all 0.2s ease; border-bottom: 2px solid transparent; }
+    .tab-btn.active { color: #10b981; border-bottom-color: #10b981; }
+    .tab-btn:not(.active) { color: #6b7280; }
+    .tab-btn:not(.active):hover { color: #9ca3af; }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* Modal */
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 200; align-items: center; justify-content: center; }
+    .modal-overlay.open { display: flex; }
+
+    /* Badges */
+    .badge-professional { background: rgba(16,185,129,0.15); color: #34d399; border: 1px solid rgba(16,185,129,0.4); }
+    .badge-student      { background: rgba(59,130,246,0.15); color: #60a5fa; border: 1px solid rgba(59,130,246,0.4); }
+    .badge-admin        { background: rgba(168,85,247,0.15); color: #c084fc; border: 1px solid rgba(168,85,247,0.4); }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: #161b22; }
+    ::-webkit-scrollbar-thumb { background: #30363d; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #10b981; }
+
+    /* User row hover */
+    .user-row { cursor: pointer; transition: background 0.15s; }
+    .user-row:hover { background: rgba(16,185,129,0.06) !important; }
   </style>
 </head>
 <body class="min-h-screen flex flex-col">
 
-  <!-- Top Navigation -->
-  <header class="border-b border-gray-800 bg-gray-900/80 sticky top-0 z-50 px-6 py-4 flex items-center justify-between">
-    <div class="flex items-center space-x-3">
-      <div class="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-xl border border-emerald-500/40">
-        🩺
-      </div>
-      <div>
-        <h1 class="text-lg font-bold text-white flex items-center gap-2">
-          Tuna AI <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800">Uganda Edition</span>
-        </h1>
-        <p class="text-xs text-gray-400">Clinical Guidelines & Vector Knowledge Admin Portal</p>
-      </div>
-    </div>
-    <div class="flex items-center space-x-4">
-      <div class="text-right hidden sm:block">
-        <span class="text-xs text-gray-500 block">AI Engine</span>
-        <span class="text-xs font-semibold text-emerald-400 flex items-center gap-1">
-          <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Groq Llama-3.3-70B
-        </span>
-      </div>
-      <input type="password" id="adminSecret" placeholder="Admin Secret Key" value="" 
-             class="bg-gray-800 border border-gray-700 text-xs text-white rounded-lg px-3 py-2 focus:ring-1 focus:ring-emerald-500 outline-none w-44">
-    </div>
-  </header>
-
-  <main class="flex-1 max-w-7xl w-full mx-auto p-6 space-y-6">
-
-    <!-- Overview Stats -->
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-      <div class="glass-card rounded-xl p-5">
-        <div class="text-gray-400 text-xs font-semibold uppercase tracking-wider">Primary Framework</div>
-        <div class="text-xl font-bold text-white mt-1">Uganda Clinical Guidelines</div>
-        <div class="text-xs text-emerald-400 mt-2 flex items-center gap-1">
-          <i class="fa-solid fa-shield-halved"></i> UCG Strict Protocol
+  <!-- ════════════════════════════════════════════════════════════════ -->
+  <!--  SECURE LOGIN GATE (Displayed when unauthenticated)             -->
+  <!-- ════════════════════════════════════════════════════════════════ -->
+  <div id="loginGate" class="min-h-screen flex items-center justify-center p-4 bg-[#090d14]">
+    <div class="glass-card max-w-md w-full rounded-2xl p-8 shadow-2xl border border-gray-800 space-y-6">
+      
+      <!-- Logo & Header -->
+      <div class="text-center space-y-2">
+        <div class="w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-3xl mx-auto flex items-center justify-center shadow-inner">
+          🛡️
         </div>
+        <h2 class="text-xl font-bold text-white tracking-tight">Tuna AI Admin Portal</h2>
+        <p class="text-xs text-gray-400">Uganda Clinical Decision Support • Restricted Access</p>
       </div>
-      <div class="glass-card rounded-xl p-5">
-        <div class="text-gray-400 text-xs font-semibold uppercase tracking-wider">Knowledge Chunks</div>
-        <div class="text-2xl font-bold text-emerald-400 mt-1" id="statChunks">--</div>
-        <div class="text-xs text-gray-500 mt-2">pgvector 1024 dims (bge-large)</div>
-      </div>
-      <div class="glass-card rounded-xl p-5">
-        <div class="text-gray-400 text-xs font-semibold uppercase tracking-wider">Registered Health Workers</div>
-        <div class="text-2xl font-bold text-white mt-1" id="statUsers">--</div>
-        <div class="text-xs text-gray-500 mt-2">Active WhatsApp Accounts</div>
-      </div>
-      <div class="glass-card rounded-xl p-5">
-        <div class="text-gray-400 text-xs font-semibold uppercase tracking-wider">Diagnostic Modules</div>
-        <div class="text-xl font-bold text-white mt-1">Text + Lab & Scan Vision</div>
-        <div class="text-xs text-emerald-400 mt-2">Groq Llama 3.2 Multimodal</div>
-      </div>
-    </div>
 
-    <!-- Main Grid: Upload & Document List -->
-    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-
-      <!-- Upload Section (5 cols) -->
-      <div class="lg:col-span-5 glass-card rounded-xl p-6 space-y-5">
+      <!-- Login Form -->
+      <form id="adminLoginForm" class="space-y-4" onsubmit="handleLoginSubmit(event)">
         <div>
-          <h2 class="text-base font-bold text-white flex items-center gap-2">
-            <i class="fa-solid fa-cloud-arrow-up text-emerald-400"></i> Upload Clinical Document
-          </h2>
-          <p class="text-xs text-gray-400 mt-1">
-            Upload PDF guidelines (UCG 2023, National Malaria Guidelines, ART Protocols). Chunks & embeddings are automatically saved to Supabase pgvector.
-          </p>
-        </div>
-
-        <form id="uploadForm" class="space-y-4">
-          <div>
-            <label class="block text-xs font-medium text-gray-300 mb-1">Document Title</label>
-            <input type="text" id="docTitle" required placeholder="e.g. Uganda Clinical Guidelines 2023"
-                   class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white focus:border-emerald-500 outline-none">
-          </div>
-
-          <div>
-            <label class="block text-xs font-medium text-gray-300 mb-1">Edition / Publication Year</label>
-            <input type="text" id="docEdition" placeholder="e.g. Ministry of Health 2023 Edition"
-                   class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white focus:border-emerald-500 outline-none">
-          </div>
-
-          <div>
-            <label class="block text-xs font-medium text-gray-300 mb-1">Select PDF File</label>
-            <div id="dropZone" class="border-2 border-dashed border-gray-700 hover:border-emerald-500/60 rounded-xl p-6 text-center cursor-pointer transition bg-gray-900/50">
-              <i class="fa-solid fa-file-pdf text-3xl text-emerald-400/70 mb-2"></i>
-              <div class="text-xs text-gray-300 font-medium" id="fileNameLabel">Click to browse or drop PDF here</div>
-              <p class="text-[10px] text-gray-500 mt-1">Supported format: PDF (up to 150 MB)</p>
-              <input type="file" id="pdfFileInput" accept=".pdf" class="hidden">
-            </div>
-          </div>
-
-          <div id="uploadProgressContainer" class="hidden space-y-2">
-            <div class="flex justify-between text-xs text-gray-400">
-              <span id="uploadStatusText">Extracting & embedding chunks...</span>
-              <span id="uploadPercent">0%</span>
-            </div>
-            <div class="w-full bg-gray-800 rounded-full h-2 overflow-hidden">
-              <div id="uploadProgressBar" class="bg-emerald-500 h-2 transition-all duration-300" style="width: 0%"></div>
-            </div>
-          </div>
-
-          <button type="submit" id="submitBtn" class="w-full btn-emerald text-white font-semibold py-2.5 px-4 rounded-lg text-sm flex items-center justify-center gap-2">
-            <i class="fa-solid fa-bolt"></i> Ingest Document into Knowledge Base
-          </button>
-        </form>
-
-        <div id="alertBox" class="hidden text-xs p-3 rounded-lg"></div>
-      </div>
-
-      <!-- Indexed Documents Table (7 cols) -->
-      <div class="lg:col-span-7 glass-card rounded-xl p-6 flex flex-col justify-between">
-        <div class="space-y-4">
-          <div class="flex items-center justify-between">
-            <h2 class="text-base font-bold text-white flex items-center gap-2">
-              <i class="fa-solid fa-book-medical text-emerald-400"></i> Indexed Knowledge Sources
-            </h2>
-            <button onclick="loadKnowledgeDocs()" class="text-xs text-gray-400 hover:text-white px-2 py-1 rounded bg-gray-800 border border-gray-700">
-              <i class="fa-solid fa-rotate-right"></i> Refresh
+          <label class="block text-xs font-semibold text-gray-300 mb-1.5 uppercase tracking-wider">Admin Secret Key</label>
+          <div class="relative">
+            <input type="password" id="loginKeyInput" required placeholder="Enter administrative key"
+                   autocomplete="current-password"
+                   class="w-full bg-gray-900/90 border border-gray-700 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-500 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none transition pr-10">
+            <button type="button" onclick="togglePasswordVisibility()" class="absolute right-3 top-3.5 text-gray-400 hover:text-gray-200 text-xs">
+              <i id="eyeIcon" class="fa-solid fa-eye"></i>
             </button>
           </div>
+        </div>
 
-          <div class="overflow-x-auto">
-            <table class="w-full text-left text-xs text-gray-300">
+        <div class="flex items-center justify-between text-xs">
+          <label class="flex items-center gap-2 text-gray-400 cursor-pointer select-none">
+            <input type="checkbox" id="rememberMeCheckbox" class="rounded bg-gray-900 border-gray-700 text-emerald-500 focus:ring-0">
+            Remember this session
+          </label>
+        </div>
+
+        <button type="submit" id="loginBtn" class="w-full btn-emerald text-white font-semibold py-3 px-4 rounded-xl text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/30">
+          <i class="fa-solid fa-lock text-xs"></i> Sign In to Portal
+        </button>
+      </form>
+
+      <!-- Alert Banner inside Login -->
+      <div id="loginAlert" class="hidden text-xs p-3 rounded-xl border"></div>
+
+      <div class="text-center text-[11px] text-gray-500 pt-2 border-t border-gray-800/80">
+        Protected by Tuna AI Security Framework<br>Unauthorized administrative access is prohibited.
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════════ -->
+  <!--  AUTHENTICATED ADMIN APP (Hidden by default until validated)    -->
+  <!-- ════════════════════════════════════════════════════════════════ -->
+  <div id="adminApp" class="hidden min-h-screen flex flex-col">
+
+    <!-- Top Navigation -->
+    <header class="border-b border-gray-800 bg-gray-900/80 sticky top-0 z-50 px-6 py-4 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-xl border border-emerald-500/40">
+          🩺
+        </div>
+        <div>
+          <h1 class="text-lg font-bold text-white flex items-center gap-2">
+            Tuna AI <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800">Uganda Edition</span>
+          </h1>
+          <p class="text-xs text-gray-400">Clinical Guidelines &amp; Knowledge Base Admin</p>
+        </div>
+      </div>
+
+      <div class="flex items-center space-x-4">
+        <div class="text-right hidden sm:block">
+          <span class="text-xs text-gray-500 block">AI Engine</span>
+          <span class="text-xs font-semibold text-emerald-400 flex items-center gap-1">
+            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Groq Llama-3.3-70B
+          </span>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <span class="text-xs px-2.5 py-1 rounded-full bg-emerald-950/80 text-emerald-400 border border-emerald-800 flex items-center gap-1.5 font-medium">
+            <i class="fa-solid fa-shield-halved text-[10px]"></i> Authorized
+          </span>
+          <button onclick="logoutAdmin()" class="bg-gray-800 hover:bg-red-950/80 hover:text-red-300 hover:border-red-800 border border-gray-700 text-gray-300 text-xs px-3 py-1.5 rounded-lg font-medium transition flex items-center gap-1.5">
+            <i class="fa-solid fa-arrow-right-from-bracket"></i> Logout
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main class="flex-1 max-w-7xl w-full mx-auto p-6 space-y-6">
+
+      <!-- ── Stats Cards ── -->
+      <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <!-- Primary Framework -->
+        <div class="glass-card rounded-xl p-5 col-span-2 md:col-span-1">
+          <div class="text-gray-400 text-xs font-semibold uppercase tracking-wider">Primary Framework</div>
+          <div class="text-base font-bold text-white mt-1 leading-tight">Uganda Clinical Guidelines</div>
+          <div class="text-xs text-emerald-400 mt-2 flex items-center gap-1">
+            <i class="fa-solid fa-shield-halved"></i> UCG Strict Protocol
+          </div>
+        </div>
+        <!-- Knowledge Chunks -->
+        <div class="glass-card rounded-xl p-5">
+          <div class="text-gray-400 text-xs font-semibold uppercase tracking-wider">Knowledge Chunks</div>
+          <div class="text-2xl font-bold text-emerald-400 mt-1" id="statChunks">--</div>
+          <div class="text-xs text-gray-500 mt-2">pgvector 1024-dims</div>
+        </div>
+        <!-- Total Users -->
+        <div class="glass-card rounded-xl p-5">
+          <div class="text-gray-400 text-xs font-semibold uppercase tracking-wider">Registered Users</div>
+          <div class="text-2xl font-bold text-white mt-1" id="statUsers">--</div>
+          <div class="text-xs text-gray-500 mt-2">Active WhatsApp Accounts</div>
+        </div>
+        <!-- Professionals -->
+        <div class="glass-card rounded-xl p-5">
+          <div class="text-gray-400 text-xs font-semibold uppercase tracking-wider">Professionals</div>
+          <div class="text-2xl font-bold text-emerald-400 mt-1" id="statProfessionals">--</div>
+          <div class="text-xs text-gray-500 mt-2">Doctors, Nurses, Officers</div>
+        </div>
+        <!-- Student Materials -->
+        <div class="glass-card rounded-xl p-5">
+          <div class="text-gray-400 text-xs font-semibold uppercase tracking-wider">Student Materials</div>
+          <div class="text-2xl font-bold text-blue-400 mt-1" id="statStudentChunks">--</div>
+          <div class="text-xs text-gray-500 mt-2">Student-tagged Chunks</div>
+        </div>
+      </div>
+
+      <!-- ── Tab Navigation ── -->
+      <div class="glass-card rounded-xl overflow-hidden">
+        <div class="flex border-b border-gray-800 px-4 pt-2 gap-1 bg-gray-900/50">
+          <button class="tab-btn active px-5 py-3 text-sm font-semibold" data-tab="knowledge">
+            <i class="fa-solid fa-book-medical mr-2"></i>Knowledge Base
+          </button>
+          <button class="tab-btn px-5 py-3 text-sm font-semibold" data-tab="users">
+            <i class="fa-solid fa-users mr-2"></i>Users
+          </button>
+          <button class="tab-btn px-5 py-3 text-sm font-semibold" data-tab="whatsapp">
+            <i class="fa-brands fa-whatsapp mr-2"></i>WhatsApp Gateway
+          </button>
+        </div>
+
+        <!-- ════════════════════════════════════════════════════════ -->
+        <!--  TAB 1 · KNOWLEDGE BASE                                 -->
+        <!-- ════════════════════════════════════════════════════════ -->
+        <div id="tab-knowledge" class="tab-panel active p-6">
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+            <!-- Upload Section (5 cols) -->
+            <div class="lg:col-span-5 space-y-5">
+              <div>
+                <h2 class="text-base font-bold text-white flex items-center gap-2">
+                  <i class="fa-solid fa-cloud-arrow-up text-emerald-400"></i> Upload Clinical Document
+                </h2>
+                <p class="text-xs text-gray-400 mt-1">
+                  Upload PDF guidelines (UCG 2023, National Malaria Guidelines, ART Protocols). Chunks &amp; embeddings are automatically saved to Supabase pgvector.
+                </p>
+              </div>
+
+              <form id="uploadForm" class="space-y-4">
+                <div>
+                  <label class="block text-xs font-medium text-gray-300 mb-1">Document Title</label>
+                  <input type="text" id="docTitle" required placeholder="e.g. Uganda Clinical Guidelines 2023"
+                         class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white focus:border-emerald-500 outline-none">
+                </div>
+
+                <div>
+                  <label class="block text-xs font-medium text-gray-300 mb-1">Edition / Publication Year</label>
+                  <input type="text" id="docEdition" placeholder="e.g. Ministry of Health 2023 Edition"
+                         class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white focus:border-emerald-500 outline-none">
+                </div>
+
+                <!-- Document Type Dropdown -->
+                <div>
+                  <label class="block text-xs font-medium text-gray-300 mb-1">Document Target Audience</label>
+                  <div class="relative">
+                    <select id="docType" required
+                            class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white focus:border-emerald-500 outline-none appearance-none">
+                      <option value="professional">Professional Guidelines (for Doctors, Nurses, Clinical Officers)</option>
+                      <option value="student">Student Learning Material (for Medical Students &amp; Learners)</option>
+                    </select>
+                    <i class="fa-solid fa-chevron-down absolute right-3 top-3 text-gray-400 pointer-events-none text-xs"></i>
+                  </div>
+                  <p class="text-[11px] text-gray-500 mt-1">Controls which users access this content during clinical inquiries.</p>
+                </div>
+
+                <div>
+                  <label class="block text-xs font-medium text-gray-300 mb-1">Select PDF File</label>
+                  <div id="dropZone" class="border-2 border-dashed border-gray-700 hover:border-emerald-500/60 rounded-xl p-6 text-center cursor-pointer transition bg-gray-900/50">
+                    <i class="fa-solid fa-file-pdf text-3xl text-emerald-400/70 mb-2"></i>
+                    <div class="text-xs text-gray-300 font-medium" id="fileNameLabel">Click to browse or drop PDF here</div>
+                    <p class="text-[10px] text-gray-500 mt-1">Supported format: PDF (up to 150 MB)</p>
+                    <input type="file" id="pdfFileInput" accept=".pdf" class="hidden">
+                  </div>
+                </div>
+
+                <div id="uploadProgressContainer" class="hidden space-y-2">
+                  <div class="flex justify-between text-xs text-gray-400">
+                    <span id="uploadStatusText">Extracting &amp; embedding chunks...</span>
+                    <span id="uploadPercent">0%</span>
+                  </div>
+                  <div class="w-full bg-gray-800 rounded-full h-2 overflow-hidden">
+                    <div id="uploadProgressBar" class="bg-emerald-500 h-2 transition-all duration-300" style="width: 0%"></div>
+                  </div>
+                </div>
+
+                <button type="submit" id="submitBtn" class="w-full btn-emerald text-white font-semibold py-2.5 px-4 rounded-lg text-sm flex items-center justify-center gap-2">
+                  <i class="fa-solid fa-bolt"></i> Ingest Document into Knowledge Base
+                </button>
+              </form>
+
+              <div id="alertBox" class="hidden text-xs p-3 rounded-lg"></div>
+            </div>
+
+            <!-- Indexed Documents Table (7 cols) -->
+            <div class="lg:col-span-7 flex flex-col justify-between">
+              <div class="space-y-4">
+                <div class="flex items-center justify-between">
+                  <h2 class="text-base font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-book-medical text-emerald-400"></i> Indexed Knowledge Sources
+                  </h2>
+                  <button onclick="loadKnowledgeDocs()" class="text-xs text-gray-400 hover:text-white px-2 py-1 rounded bg-gray-800 border border-gray-700">
+                    <i class="fa-solid fa-rotate-right"></i> Refresh
+                  </button>
+                </div>
+
+                <div class="overflow-x-auto">
+                  <table class="w-full text-left text-xs text-gray-300">
+                    <thead class="text-[11px] uppercase bg-gray-900/80 text-gray-400 border-b border-gray-800">
+                      <tr>
+                        <th class="py-2.5 px-3">Document Title</th>
+                        <th class="py-2.5 px-3">Audience</th>
+                        <th class="py-2.5 px-3">Edition</th>
+                        <th class="py-2.5 px-3 text-center">Vector Chunks</th>
+                        <th class="py-2.5 px-3 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody id="docsTableBody" class="divide-y divide-gray-800">
+                      <tr>
+                        <td colspan="5" class="py-8 text-center text-gray-500">Loading indexed documents...</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- Testing Query Sandbox -->
+              <div class="mt-6 pt-5 border-t border-gray-800 space-y-3">
+                <h3 class="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                  <i class="fa-solid fa-stethoscope text-emerald-400"></i> UCG Diagnostic Verification Sandbox
+                </h3>
+                <div class="flex gap-2">
+                  <input type="text" id="testQuery" placeholder="Ask a test query: e.g. Management of severe pre-eclampsia at HC IV"
+                         class="flex-1 bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-xs text-white focus:border-emerald-500 outline-none">
+                  <button onclick="runTestQuery()" id="testQueryBtn" class="bg-gray-800 hover:bg-gray-700 border border-gray-600 text-white text-xs px-4 py-2 rounded-lg font-medium">
+                    Test AI
+                  </button>
+                </div>
+                <div id="testResultBox" class="hidden bg-gray-900/90 rounded-lg p-3 text-xs text-gray-200 border border-gray-800 max-h-56 overflow-y-auto whitespace-pre-wrap font-sans"></div>
+              </div>
+            </div>
+
+          </div>
+        </div><!-- /tab-knowledge -->
+
+        <!-- ════════════════════════════════════════════════════════ -->
+        <!--  TAB 2 · USERS                                          -->
+        <!-- ════════════════════════════════════════════════════════ -->
+        <div id="tab-users" class="tab-panel p-6 space-y-4">
+          <div class="flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
+            <h2 class="text-base font-bold text-white flex items-center gap-2">
+              <i class="fa-solid fa-users text-emerald-400"></i> Registered Users
+              <span id="usersCountBadge" class="text-xs px-2 py-0.5 rounded-full bg-gray-800 text-gray-400 border border-gray-700">0</span>
+            </h2>
+            <div class="flex gap-2 flex-wrap">
+              <!-- Search -->
+              <div class="relative">
+                <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-2 text-gray-500 text-xs"></i>
+                <input type="text" id="userSearchInput" placeholder="Search name or WhatsApp…"
+                       class="bg-gray-900 border border-gray-700 rounded-lg pl-7 pr-3 py-1.5 text-xs text-white focus:border-emerald-500 outline-none w-52">
+              </div>
+              <!-- Role filter -->
+              <select id="userRoleFilter"
+                      class="bg-gray-900 border border-gray-700 rounded-lg px-3 py-1.5 text-xs text-white focus:border-emerald-500 outline-none">
+                <option value="">All Roles</option>
+                <option value="professional">Professional</option>
+                <option value="student">Student</option>
+              </select>
+              <!-- Refresh -->
+              <button onclick="loadUsers()" class="btn-emerald text-white text-xs font-semibold px-4 py-1.5 rounded-lg flex items-center gap-1.5">
+                <i class="fa-solid fa-rotate-right"></i> Refresh
+              </button>
+            </div>
+          </div>
+
+          <div id="usersAlert" class="hidden text-xs p-3 rounded-lg"></div>
+
+          <div class="overflow-x-auto rounded-xl border border-gray-800">
+            <table class="w-full text-left text-xs text-gray-300 min-w-[800px]">
               <thead class="text-[11px] uppercase bg-gray-900/80 text-gray-400 border-b border-gray-800">
                 <tr>
-                  <th class="py-2.5 px-3">Document Title</th>
-                  <th class="py-2.5 px-3">Edition</th>
-                  <th class="py-2.5 px-3 text-center">Vector Chunks</th>
-                  <th class="py-2.5 px-3 text-right">Actions</th>
+                  <th class="py-3 px-4">Name</th>
+                  <th class="py-3 px-4">WhatsApp ID</th>
+                  <th class="py-3 px-4">Profession</th>
+                  <th class="py-3 px-4">Role</th>
+                  <th class="py-3 px-4">Practicing #</th>
+                  <th class="py-3 px-4 text-center">Credits</th>
+                  <th class="py-3 px-4 text-center">Status</th>
+                  <th class="py-3 px-4">Registered</th>
                 </tr>
               </thead>
-              <tbody id="docsTableBody" class="divide-y divide-gray-800">
+              <tbody id="usersTableBody" class="divide-y divide-gray-800">
                 <tr>
-                  <td colspan="4" class="py-8 text-center text-gray-500">Loading indexed documents...</td>
+                  <td colspan="8" class="py-10 text-center text-gray-500">
+                    <i class="fa-solid fa-users-slash text-2xl mb-2 block opacity-40"></i>
+                    Click Refresh to load users
+                  </td>
                 </tr>
               </tbody>
             </table>
           </div>
-        </div>
+        </div><!-- /tab-users -->
 
-        <!-- Testing Query Sandbox -->
-        <div class="mt-6 pt-5 border-t border-gray-800 space-y-3">
-          <h3 class="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
-            <i class="fa-solid fa-stethoscope text-emerald-400"></i> UCG Diagnostic Verification Sandbox
-          </h3>
-          <div class="flex gap-2">
-            <input type="text" id="testQuery" placeholder="Ask a test query: e.g. Management of severe pre-eclampsia at HC IV"
-                   class="flex-1 bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-xs text-white focus:border-emerald-500 outline-none">
-            <button onclick="runTestQuery()" id="testQueryBtn" class="bg-gray-800 hover:bg-gray-700 border border-gray-600 text-white text-xs px-4 py-2 rounded-lg font-medium">
-              Test AI
-            </button>
+        <!-- ════════════════════════════════════════════════════════ -->
+        <!--  TAB 3 · WHATSAPP GATEWAY                               -->
+        <!-- ════════════════════════════════════════════════════════ -->
+        <div id="tab-whatsapp" class="tab-panel p-6 space-y-4">
+          <div class="flex items-center justify-between">
+            <h2 class="text-base font-bold text-white flex items-center gap-2">
+              <i class="fa-brands fa-whatsapp text-emerald-400"></i> WhatsApp Gateway Connection
+            </h2>
+            <div id="waStatusBadge" class="text-xs px-3 py-1 rounded-full bg-gray-800 border border-gray-700 text-gray-400">
+              ● Checking...
+            </div>
           </div>
-          <div id="testResultBox" class="hidden bg-gray-900/90 rounded-lg p-3 text-xs text-gray-200 border border-gray-800 max-h-56 overflow-y-auto whitespace-pre-wrap font-sans"></div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+            <!-- QR Display -->
+            <div class="flex flex-col items-center justify-center bg-gray-900/60 rounded-xl border border-gray-800 p-6 min-h-[260px]">
+              <div id="qrSpinner" class="text-gray-500 text-sm text-center space-y-2">
+                <i class="fa-solid fa-spinner fa-spin text-2xl text-emerald-400"></i>
+                <p>Enter your Gateway URL &amp; secret to load QR</p>
+              </div>
+              <img id="qrImage" src="" alt="WhatsApp QR Code" class="hidden rounded-lg w-64 h-64 object-contain border border-emerald-800">
+              <p id="qrOnlineMsg" class="hidden text-emerald-400 font-semibold text-center text-sm">
+                <i class="fa-solid fa-circle-check text-xl"></i><br>WhatsApp Gateway Connected!
+              </p>
+            </div>
+
+            <!-- Controls -->
+            <div class="space-y-4">
+              <div>
+                <label class="block text-xs font-medium text-gray-300 mb-1">Gateway Worker URL</label>
+                <input type="text" id="gatewayUrl" placeholder="https://tuna.up.railway.app"
+                       class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white focus:border-emerald-500 outline-none">
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-300 mb-1">Gateway Secret Key</label>
+                <input type="password" id="gatewaySecret" placeholder="tuna-ai-uganda-secret-2026"
+                       class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white focus:border-emerald-500 outline-none">
+              </div>
+              <div class="flex gap-3">
+                <button onclick="loadQR()" class="flex-1 btn-emerald text-white font-semibold py-2.5 px-4 rounded-lg text-sm flex items-center justify-center gap-2">
+                  <i class="fa-solid fa-qrcode"></i> Load QR Code
+                </button>
+                <button onclick="resetGatewaySession()" class="bg-red-950 hover:bg-red-900 border border-red-800 text-red-300 font-semibold py-2.5 px-4 rounded-lg text-sm flex items-center gap-2">
+                  <i class="fa-solid fa-rotate-right"></i> Reset Session
+                </button>
+              </div>
+              <p class="text-xs text-gray-500">
+                Scan the QR code with WhatsApp → <strong>Settings → Linked Devices → Link a Device</strong>.<br>
+                QR refreshes automatically while connecting.
+              </p>
+              <div id="gatewayAlertBox" class="hidden text-xs p-3 rounded-lg"></div>
+            </div>
+          </div>
+        </div><!-- /tab-whatsapp -->
+
+      </div><!-- /glass-card tabs container -->
+
+    </main>
+
+    <footer class="border-t border-gray-800 px-6 py-4 text-center text-xs text-gray-500">
+      Tuna AI Medical Assistant • Tailored for Uganda Healthcare System • Ministry of Health Guidelines Decision Support
+    </footer>
+
+    <!-- ════════════════════════════════════════════════════════════════ -->
+    <!--  USER DETAIL MODAL                                              -->
+    <!-- ════════════════════════════════════════════════════════════════ -->
+    <div id="userModal" class="modal-overlay" onclick="closeUserModal(event)">
+      <div class="glass-card rounded-2xl w-full max-w-lg mx-4 max-h-[85vh] overflow-y-auto p-6 space-y-5 relative" onclick="event.stopPropagation()">
+        <!-- Close -->
+        <button onclick="closeUserModal()" class="absolute top-4 right-4 text-gray-500 hover:text-white text-sm">
+          <i class="fa-solid fa-xmark fa-lg"></i>
+        </button>
+        <h3 class="text-base font-bold text-white flex items-center gap-2">
+          <i class="fa-solid fa-user-circle text-emerald-400"></i>
+          <span id="modalUserName">User Details</span>
+        </h3>
+
+        <div class="grid grid-cols-2 gap-3 text-xs">
+          <div class="glass-card rounded-lg p-3 space-y-1">
+            <div class="text-gray-400 uppercase tracking-wider text-[10px]">WhatsApp ID</div>
+            <div class="text-white font-medium" id="modalWhatsapp">--</div>
+          </div>
+          <div class="glass-card rounded-lg p-3 space-y-1">
+            <div class="text-gray-400 uppercase tracking-wider text-[10px]">Role</div>
+            <div id="modalRoleBadge">--</div>
+          </div>
+          <div class="glass-card rounded-lg p-3 space-y-1">
+            <div class="text-gray-400 uppercase tracking-wider text-[10px]">Profession</div>
+            <div class="text-white font-medium" id="modalProfession">--</div>
+          </div>
+          <div class="glass-card rounded-lg p-3 space-y-1">
+            <div class="text-gray-400 uppercase tracking-wider text-[10px]">Practicing #</div>
+            <div class="text-white font-medium" id="modalPracticingNo">--</div>
+          </div>
+          <div class="glass-card rounded-lg p-3 space-y-1">
+            <div class="text-gray-400 uppercase tracking-wider text-[10px]">Credits</div>
+            <div class="text-emerald-400 font-bold text-base" id="modalCredits">--</div>
+          </div>
+          <div class="glass-card rounded-lg p-3 space-y-1">
+            <div class="text-gray-400 uppercase tracking-wider text-[10px]">Status</div>
+            <div id="modalStatus">--</div>
+          </div>
+          <div class="glass-card rounded-lg p-3 space-y-1 col-span-2">
+            <div class="text-gray-400 uppercase tracking-wider text-[10px]">Registered Date</div>
+            <div class="text-white font-medium" id="modalRegistered">--</div>
+          </div>
         </div>
 
+        <!-- Case History -->
+        <div>
+          <h4 class="text-xs font-bold text-white uppercase tracking-wider mb-2 flex items-center gap-2">
+            <i class="fa-solid fa-clock-rotate-left text-emerald-400"></i> Case History
+          </h4>
+          <div id="modalCaseHistory" class="bg-gray-900/60 rounded-lg border border-gray-800 p-3 text-xs text-gray-400 max-h-40 overflow-y-auto">
+            Loading cases...
+          </div>
+        </div>
       </div>
-
     </div>
 
-    <!-- WhatsApp Gateway QR Panel -->
-    <div class="glass-card rounded-xl p-6 space-y-4">
-      <div class="flex items-center justify-between">
-        <h2 class="text-base font-bold text-white flex items-center gap-2">
-          <i class="fa-brands fa-whatsapp text-emerald-400"></i> WhatsApp Gateway Connection
-        </h2>
-        <div id="waStatusBadge" class="text-xs px-3 py-1 rounded-full bg-gray-800 border border-gray-700 text-gray-400">
-          ● Checking...
-        </div>
-      </div>
+  </div><!-- /adminApp -->
 
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
-        <!-- QR Display -->
-        <div class="flex flex-col items-center justify-center bg-gray-900/60 rounded-xl border border-gray-800 p-6 min-h-[260px]">
-          <div id="qrSpinner" class="text-gray-500 text-sm text-center space-y-2">
-            <i class="fa-solid fa-spinner fa-spin text-2xl text-emerald-400"></i>
-            <p>Enter your Gateway URL &amp; secret to load QR</p>
-          </div>
-          <img id="qrImage" src="" alt="WhatsApp QR Code" class="hidden rounded-lg w-64 h-64 object-contain border border-emerald-800">
-          <p id="qrOnlineMsg" class="hidden text-emerald-400 font-semibold text-center text-sm">
-            <i class="fa-solid fa-circle-check text-xl"></i><br>WhatsApp is Connected!
-          </p>
-        </div>
-
-        <!-- Controls -->
-        <div class="space-y-4">
-          <div>
-            <label class="block text-xs font-medium text-gray-300 mb-1">Gateway Worker URL</label>
-            <input type="text" id="gatewayUrl" placeholder="https://tuna.up.railway.app"
-                   class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white focus:border-emerald-500 outline-none">
-          </div>
-          <div>
-            <label class="block text-xs font-medium text-gray-300 mb-1">Gateway Secret</label>
-            <input type="password" id="gatewaySecret" placeholder="tuna-ai-uganda-secret-2026"
-                   class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white focus:border-emerald-500 outline-none">
-          </div>
-          <div class="flex gap-3">
-            <button onclick="loadQR()" class="flex-1 btn-emerald text-white font-semibold py-2.5 px-4 rounded-lg text-sm flex items-center justify-center gap-2">
-              <i class="fa-solid fa-qrcode"></i> Load QR Code
-            </button>
-            <button onclick="resetGatewaySession()" class="bg-red-950 hover:bg-red-900 border border-red-800 text-red-300 font-semibold py-2.5 px-4 rounded-lg text-sm flex items-center gap-2">
-              <i class="fa-solid fa-rotate-right"></i> Reset Session
-            </button>
-          </div>
-          <p class="text-xs text-gray-500">
-            Scan the QR code with WhatsApp → <strong>Settings → Linked Devices → Link a Device</strong>.<br>
-            QR refreshes every 5 seconds automatically.
-          </p>
-          <div id="gatewayAlertBox" class="hidden text-xs p-3 rounded-lg"></div>
-        </div>
-      </div>
-    </div>
-
-  </main>
-
-  <footer class="border-t border-gray-800 px-6 py-4 text-center text-xs text-gray-500">
-    Tuna AI Medical Assistant • Tailored for Uganda Healthcare System • Ministry of Health Guidelines Decision Support
-  </footer>
-
+  <!-- ════════════════════════════════════════════════════════════════ -->
+  <!--  JAVASCRIPT ENGINE                                              -->
+  <!-- ════════════════════════════════════════════════════════════════ -->
   <script>
-    const fileInput = document.getElementById('pdfFileInput');
-    const dropZone = document.getElementById('dropZone');
-    const fileNameLabel = document.getElementById('fileNameLabel');
-    const uploadForm = document.getElementById('uploadForm');
-    const alertBox = document.getElementById('alertBox');
-    const adminSecretInput = document.getElementById('adminSecret');
-
-    // Default admin secret from localStorage if saved
-    if (localStorage.getItem('tuna_admin_secret')) {
-      adminSecretInput.value = localStorage.getItem('tuna_admin_secret');
+    // ── Authentication Management ─────────────────────────────────────
+    function getAdminSecret() {
+      return sessionStorage.getItem('tuna_admin_secret') ||
+             localStorage.getItem('tuna_admin_secret') ||
+             '';
     }
-    adminSecretInput.addEventListener('change', () => {
-      localStorage.setItem('tuna_admin_secret', adminSecretInput.value);
+
+    function togglePasswordVisibility() {
+      const input = document.getElementById('loginKeyInput');
+      const icon = document.getElementById('eyeIcon');
+      if (input.type === 'password') {
+        input.type = 'text';
+        icon.className = 'fa-solid fa-eye-slash';
+      } else {
+        input.type = 'password';
+        icon.className = 'fa-solid fa-eye';
+      }
+    }
+
+    async function handleLoginSubmit(e) {
+      e.preventDefault();
+      const keyInput = document.getElementById('loginKeyInput');
+      const rememberMe = document.getElementById('rememberMeCheckbox').checked;
+      const secret = keyInput.value.trim();
+      const loginBtn = document.getElementById('loginBtn');
+      const loginAlert = document.getElementById('loginAlert');
+
+      if (!secret) return;
+
+      loginBtn.disabled = true;
+      loginBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-xs"></i> Verifying Credentials...';
+      loginAlert.classList.add('hidden');
+
+      try {
+        const res = await fetch('/api/v1/admin/verify-auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ secret })
+        });
+
+        if (res.ok) {
+          sessionStorage.setItem('tuna_admin_secret', secret);
+          if (rememberMe) {
+            localStorage.setItem('tuna_admin_secret', secret);
+          } else {
+            localStorage.removeItem('tuna_admin_secret');
+          }
+          unlockDashboard();
+        } else {
+          showLoginAlert('❌ Invalid Admin Secret Key. Access Denied.', 'error');
+        }
+      } catch (err) {
+        showLoginAlert('❌ Network error connecting to security server.', 'error');
+      } finally {
+        loginBtn.disabled = false;
+        loginBtn.innerHTML = '<i class="fa-solid fa-lock text-xs"></i> Sign In to Portal';
+      }
+    }
+
+    function showLoginAlert(msg, type) {
+      const alert = document.getElementById('loginAlert');
+      alert.textContent = msg;
+      alert.className = type === 'error'
+        ? 'text-xs p-3 rounded-xl bg-red-950/80 text-red-300 border border-red-800'
+        : 'text-xs p-3 rounded-xl bg-emerald-950/80 text-emerald-300 border border-emerald-800';
+      alert.classList.remove('hidden');
+    }
+
+    function unlockDashboard() {
+      document.getElementById('loginGate').classList.add('hidden');
+      document.getElementById('adminApp').classList.remove('hidden');
       loadKnowledgeDocs();
+      loadUsers();
+      if (localStorage.getItem('tuna_gateway_url')) {
+        loadQR();
+      }
+    }
+
+    function logoutAdmin() {
+      sessionStorage.removeItem('tuna_admin_secret');
+      localStorage.removeItem('tuna_admin_secret');
+      document.getElementById('adminApp').classList.add('hidden');
+      document.getElementById('loginGate').classList.remove('hidden');
+      document.getElementById('loginKeyInput').value = '';
+      showLoginAlert('🔒 You have been securely logged out.', 'info');
+    }
+
+    function onAuthExpired() {
+      logoutAdmin();
+      showLoginAlert('⚠️ Admin session expired or invalid. Please sign in again.', 'error');
+    }
+
+    // Check existing session on boot
+    async function checkExistingSession() {
+      const secret = getAdminSecret();
+      if (!secret) {
+        document.getElementById('loginGate').classList.remove('hidden');
+        document.getElementById('adminApp').classList.add('hidden');
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/v1/admin/verify-auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ secret })
+        });
+        if (res.ok) {
+          unlockDashboard();
+        } else {
+          sessionStorage.removeItem('tuna_admin_secret');
+          localStorage.removeItem('tuna_admin_secret');
+          document.getElementById('loginGate').classList.remove('hidden');
+          document.getElementById('adminApp').classList.add('hidden');
+        }
+      } catch (err) {
+        document.getElementById('loginGate').classList.remove('hidden');
+        document.getElementById('adminApp').classList.add('hidden');
+      }
+    }
+
+    // ── UI Alert Helpers ──────────────────────────────────────────────
+    function showAlert(id, msg, type) {
+      const box = document.getElementById(id);
+      if (!box) return;
+      box.innerHTML = msg;
+      box.className = type === 'success'
+        ? 'text-xs p-3 rounded-lg bg-emerald-950/80 text-emerald-300 border border-emerald-800'
+        : type === 'info'
+        ? 'text-xs p-3 rounded-lg bg-blue-950/80 text-blue-300 border border-blue-800'
+        : 'text-xs p-3 rounded-lg bg-red-950/80 text-red-300 border border-red-800';
+      box.classList.remove('hidden');
+    }
+
+    function roleBadgeHtml(role) {
+      if (!role) return '<span class="text-gray-500">—</span>';
+      const cls = role === 'professional' ? 'badge-professional'
+                : role === 'student'      ? 'badge-student'
+                :                          'badge-admin';
+      return `<span class="text-[11px] px-2 py-0.5 rounded-full font-medium ${cls}">${role}</span>`;
+    }
+
+    function statusBadgeHtml(active) {
+      return active
+        ? '<span class="text-[11px] px-2 py-0.5 rounded-full bg-emerald-950/60 text-emerald-400 border border-emerald-800">Active</span>'
+        : '<span class="text-[11px] px-2 py-0.5 rounded-full bg-red-950/60 text-red-400 border border-red-900">Suspended</span>';
+    }
+
+    function fmtDate(iso) {
+      if (!iso) return '—';
+      try { return new Date(iso).toLocaleDateString('en-UG', { day: '2-digit', month: 'short', year: 'numeric' }); }
+      catch { return iso; }
+    }
+
+    // ── Tab Navigation ────────────────────────────────────────────────
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const tab = btn.dataset.tab;
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById('tab-' + tab).classList.add('active');
+      });
     });
+
+    // ── Upload Form / Drop Zone ───────────────────────────────────────
+    const fileInput    = document.getElementById('pdfFileInput');
+    const dropZone     = document.getElementById('dropZone');
+    const fileNameLabel= document.getElementById('fileNameLabel');
+    const uploadForm   = document.getElementById('uploadForm');
 
     dropZone.addEventListener('click', () => fileInput.click());
     fileInput.addEventListener('change', () => {
       if (fileInput.files.length > 0) {
-        fileNameLabel.textContent = fileInput.files[0].name + " (" + (fileInput.files[0].size / 1024 / 1024).toFixed(2) + " MB)";
+        fileNameLabel.textContent = fileInput.files[0].name + ' (' + (fileInput.files[0].size / 1024 / 1024).toFixed(2) + ' MB)';
       }
     });
-
-    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('border-emerald-500'); });
-    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('border-emerald-500'));
+    dropZone.addEventListener('dragover',  (e) => { e.preventDefault(); dropZone.classList.add('border-emerald-500'); });
+    dropZone.addEventListener('dragleave', ()  => dropZone.classList.remove('border-emerald-500'));
     dropZone.addEventListener('drop', (e) => {
       e.preventDefault();
       dropZone.classList.remove('border-emerald-500');
       if (e.dataTransfer.files.length > 0) {
         fileInput.files = e.dataTransfer.files;
-        fileNameLabel.textContent = fileInput.files[0].name + " (" + (fileInput.files[0].size / 1024 / 1024).toFixed(2) + " MB)";
+        fileNameLabel.textContent = fileInput.files[0].name + ' (' + (fileInput.files[0].size / 1024 / 1024).toFixed(2) + ' MB)';
       }
     });
 
-    // Upload Document
     uploadForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       if (!fileInput.files || fileInput.files.length === 0) {
-        showAlert('Please select a PDF document to upload', 'error');
+        showAlert('alertBox', 'Please select a PDF document to upload', 'error');
         return;
       }
 
-      const secret = adminSecretInput.value || 'tuna-admin-uganda-pass';
-      const formData = new FormData();
-      formData.append('file', fileInput.files[0]);
-      formData.append('title', document.getElementById('docTitle').value);
-      formData.append('edition', document.getElementById('docEdition').value);
+      const secret = getAdminSecret();
+      if (!secret) { onAuthExpired(); return; }
 
-      const submitBtn = document.getElementById('submitBtn');
+      const formData = new FormData();
+      formData.append('file',     fileInput.files[0]);
+      formData.append('title',    document.getElementById('docTitle').value);
+      formData.append('edition',  document.getElementById('docEdition').value);
+      formData.append('doc_type', document.getElementById('docType').value);
+
+      const submitBtn       = document.getElementById('submitBtn');
       const progressContainer = document.getElementById('uploadProgressContainer');
-      const progressBar = document.getElementById('uploadProgressBar');
-      const statusText = document.getElementById('uploadStatusText');
-      const percentText = document.getElementById('uploadPercent');
+      const progressBar     = document.getElementById('uploadProgressBar');
+      const percentText     = document.getElementById('uploadPercent');
 
       submitBtn.disabled = true;
       submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processing & Generating Embeddings...';
@@ -294,26 +705,27 @@
       percentText.textContent = '35%';
 
       try {
-        const response = await fetch('/api/v1/admin/upload-doc', {
+        const res = await fetch('/api/v1/admin/upload-doc', {
           method: 'POST',
           headers: { 'x-admin-secret': secret },
           body: formData
         });
 
+        if (res.status === 401) { onAuthExpired(); return; }
+
         progressBar.style.width = '100%';
         percentText.textContent = '100%';
-
-        const data = await response.json();
-        if (response.ok) {
-          showAlert(`✅ Success: Ingested "${data.title}" with ${data.chunks_count} vector chunks into Supabase!`, 'success');
+        const data = await res.json();
+        if (res.ok) {
+          showAlert('alertBox', `✅ Success: Ingested "<strong>${data.title}</strong>" — ${data.chunks_count} vector chunks saved to Supabase!`, 'success');
           uploadForm.reset();
           fileNameLabel.textContent = 'Click to browse or drop PDF here';
           loadKnowledgeDocs();
         } else {
-          showAlert(`❌ Upload failed: ${data.detail || data.message || 'Server error'}`, 'error');
+          showAlert('alertBox', `❌ Upload failed: ${data.detail || data.message || 'Server error'}`, 'error');
         }
       } catch (err) {
-        showAlert(`❌ Network error: ${err.message}`, 'error');
+        showAlert('alertBox', `❌ Network error: ${err.message}`, 'error');
       } finally {
         submitBtn.disabled = false;
         submitBtn.innerHTML = '<i class="fa-solid fa-bolt"></i> Ingest Document into Knowledge Base';
@@ -321,44 +733,46 @@
       }
     });
 
-    function showAlert(msg, type) {
-      alertBox.textContent = msg;
-      alertBox.className = type === 'success' 
-        ? 'text-xs p-3 rounded-lg bg-emerald-950/80 text-emerald-300 border border-emerald-800' 
-        : 'text-xs p-3 rounded-lg bg-red-950/80 text-red-300 border border-red-800';
-      alertBox.classList.remove('hidden');
-    }
-
-    // Load Knowledge Docs
+    // ── Knowledge Docs ───────────────────────────────────────────────
     async function loadKnowledgeDocs() {
-      const secret = adminSecretInput.value || 'tuna-admin-uganda-pass';
+      const secret = getAdminSecret();
+      if (!secret) return;
+
       try {
         const res = await fetch('/api/v1/admin/knowledge-stats', {
           headers: { 'x-admin-secret': secret }
         });
-        if (!res.ok) throw new Error('Failed to fetch knowledge stats');
+        if (res.status === 401) { onAuthExpired(); return; }
+        if (!res.ok) throw new Error('HTTP ' + res.status);
         const data = await res.json();
 
-        document.getElementById('statChunks').textContent = data.total_chunks || 0;
-        document.getElementById('statUsers').textContent = data.total_users || 0;
+        document.getElementById('statChunks').textContent  = (data.total_chunks ?? 0).toLocaleString();
+        document.getElementById('statUsers').textContent   = (data.total_users  ?? 0).toLocaleString();
+        document.getElementById('statStudentChunks').textContent = (data.student_chunks ?? '0').toLocaleString();
 
         const tbody = document.getElementById('docsTableBody');
         tbody.innerHTML = '';
 
         if (!data.documents || data.documents.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="4" class="py-6 text-center text-gray-500">No medical documents indexed yet. Upload a PDF on the left.</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="5" class="py-6 text-center text-gray-500">No medical documents indexed yet. Upload a PDF on the left.</td></tr>';
           return;
         }
 
         data.documents.forEach(doc => {
+          const docType = doc.doc_type || 'professional';
+          const typeBadge = docType === 'student'
+            ? '<span class="text-[11px] px-2 py-0.5 rounded-full badge-student">Student</span>'
+            : '<span class="text-[11px] px-2 py-0.5 rounded-full badge-professional">Professional</span>';
+
           const tr = document.createElement('tr');
           tr.className = 'hover:bg-gray-800/40 transition';
           tr.innerHTML = `
             <td class="py-3 px-3 font-medium text-white">${doc.title}</td>
+            <td class="py-3 px-3">${typeBadge}</td>
             <td class="py-3 px-3 text-gray-400">${doc.edition || 'Standard'}</td>
             <td class="py-3 px-3 text-center"><span class="px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800 text-[11px]">${doc.chunks} chunks</span></td>
             <td class="py-3 px-3 text-right">
-              <button onclick="deleteDoc('${encodeURIComponent(doc.title)}')" class="text-red-400 hover:text-red-300 px-2 py-1 rounded bg-red-950/50 border border-red-900/50">
+              <button onclick="deleteDoc('${encodeURIComponent(doc.title)}')" class="text-red-400 hover:text-red-300 px-2 py-1 rounded bg-red-950/50 border border-red-900/50 text-xs">
                 <i class="fa-solid fa-trash-can"></i> Delete
               </button>
             </td>
@@ -366,36 +780,35 @@
           tbody.appendChild(tr);
         });
       } catch (e) {
-        console.error(e);
+        console.error('loadKnowledgeDocs error:', e);
       }
     }
 
     async function deleteDoc(docTitle) {
-      if (!confirm(`Are you sure you want to remove all vector chunks for: ${decodeURIComponent(docTitle)}?`)) return;
-      const secret = adminSecretInput.value || 'tuna-admin-uganda-pass';
+      if (!confirm(`Remove all vector chunks for: ${decodeURIComponent(docTitle)}?`)) return;
+      const secret = getAdminSecret();
+      if (!secret) { onAuthExpired(); return; }
+
       try {
         const res = await fetch(`/api/v1/admin/delete-doc?title=${docTitle}`, {
           method: 'DELETE',
           headers: { 'x-admin-secret': secret }
         });
-        if (res.ok) {
-          loadKnowledgeDocs();
-        } else {
-          alert('Delete failed');
-        }
-      } catch (err) {
-        alert(err.message);
-      }
+        if (res.status === 401) { onAuthExpired(); return; }
+        if (res.ok) loadKnowledgeDocs();
+        else alert('Delete failed');
+      } catch (err) { alert(err.message); }
     }
 
-    // Run Test Query
+    // ── Test Query Sandbox ───────────────────────────────────────────
     async function runTestQuery() {
       const q = document.getElementById('testQuery').value.trim();
       if (!q) return;
-      const secret = adminSecretInput.value || 'tuna-admin-uganda-pass';
+      const secret = getAdminSecret();
+      if (!secret) { onAuthExpired(); return; }
+
       const btn = document.getElementById('testQueryBtn');
       const box = document.getElementById('testResultBox');
-
       btn.disabled = true;
       btn.textContent = 'Analyzing...';
       box.classList.remove('hidden');
@@ -404,12 +817,10 @@
       try {
         const res = await fetch('/api/v1/admin/test-query', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-admin-secret': secret
-          },
+          headers: { 'Content-Type': 'application/json', 'x-admin-secret': secret },
           body: JSON.stringify({ prompt: q })
         });
+        if (res.status === 401) { onAuthExpired(); return; }
         const data = await res.json();
         box.textContent = data.response || data.detail || 'No response';
       } catch (err) {
@@ -419,21 +830,146 @@
         btn.textContent = 'Test AI';
       }
     }
+    document.getElementById('testQuery').addEventListener('keydown', e => { if (e.key === 'Enter') runTestQuery(); });
 
+    // ── Users Management ─────────────────────────────────────────────
+    let allUsers = [];
 
-    // ── WhatsApp QR Panel ─────────────────────────────────────────────
+    async function loadUsers() {
+      const secret = getAdminSecret();
+      if (!secret) return;
+
+      showAlert('usersAlert', '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Loading users…', 'info');
+      try {
+        const res = await fetch('/api/v1/admin/users', {
+          headers: { 'x-admin-secret': secret }
+        });
+        if (res.status === 401) { onAuthExpired(); return; }
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+        allUsers = Array.isArray(data) ? data : (data.users || []);
+        document.getElementById('usersAlert').classList.add('hidden');
+        renderUsersTable(allUsers);
+        updateUserStats(allUsers);
+      } catch (err) {
+        showAlert('usersAlert', `❌ Failed to load users: ${err.message}`, 'error');
+      }
+    }
+
+    function updateUserStats(users) {
+      const professionals = users.filter(u => (u.role || '').toLowerCase() === 'professional').length;
+      document.getElementById('statUsers').textContent = users.length.toLocaleString();
+      document.getElementById('statProfessionals').textContent = professionals.toLocaleString();
+      document.getElementById('usersCountBadge').textContent = users.length;
+    }
+
+    function renderUsersTable(users) {
+      const tbody = document.getElementById('usersTableBody');
+      if (!users || users.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="py-10 text-center text-gray-500"><i class="fa-solid fa-users-slash text-2xl mb-2 block opacity-40"></i>No users registered yet.</td></tr>';
+        document.getElementById('usersCountBadge').textContent = 0;
+        return;
+      }
+      document.getElementById('usersCountBadge').textContent = users.length;
+      tbody.innerHTML = '';
+      users.forEach((u, idx) => {
+        const role   = (u.role || '').toLowerCase();
+        const active = u.status !== 'suspended';
+        const tr = document.createElement('tr');
+        tr.className = 'user-row divide-x divide-gray-800/40 ' + (idx % 2 === 0 ? 'bg-gray-900/20' : '');
+        tr.innerHTML = `
+          <td class="py-3 px-4 font-medium text-white whitespace-nowrap">${u.name || '—'}</td>
+          <td class="py-3 px-4 text-gray-300 whitespace-nowrap">${u.whatsapp_id || '—'}</td>
+          <td class="py-3 px-4 text-gray-300">${u.profession || '—'}</td>
+          <td class="py-3 px-4">${roleBadgeHtml(role)}</td>
+          <td class="py-3 px-4 text-gray-300">${u.practicing_number || '—'}</td>
+          <td class="py-3 px-4 text-center font-semibold text-emerald-400">${u.credit_balance ?? '—'}</td>
+          <td class="py-3 px-4 text-center">${statusBadgeHtml(active)}</td>
+          <td class="py-3 px-4 text-gray-400 whitespace-nowrap">${fmtDate(u.created_at)}</td>
+        `;
+        tr.addEventListener('click', () => openUserModal(u));
+        tbody.appendChild(tr);
+      });
+    }
+
+    function filterUsers() {
+      const q    = document.getElementById('userSearchInput').value.toLowerCase();
+      const role = document.getElementById('userRoleFilter').value.toLowerCase();
+      const filtered = allUsers.filter(u => {
+        const name    = (u.name || '').toLowerCase();
+        const phone   = (u.whatsapp_id || '').toLowerCase();
+        const uRole   = (u.role || '').toLowerCase();
+        const matchQ  = !q    || name.includes(q) || phone.includes(q);
+        const matchR  = !role || uRole === role;
+        return matchQ && matchR;
+      });
+      renderUsersTable(filtered);
+    }
+    document.getElementById('userSearchInput').addEventListener('input', filterUsers);
+    document.getElementById('userRoleFilter').addEventListener('change', filterUsers);
+
+    // ── User Modal ───────────────────────────────────────────────────
+    function openUserModal(u) {
+      const role   = (u.role || '').toLowerCase();
+      const active = u.status !== 'suspended';
+      document.getElementById('modalUserName').textContent   = u.name || 'Unknown User';
+      document.getElementById('modalWhatsapp').textContent   = u.whatsapp_id || '—';
+      document.getElementById('modalProfession').textContent = u.profession || '—';
+      document.getElementById('modalPracticingNo').textContent = u.practicing_number || '—';
+      document.getElementById('modalCredits').textContent    = u.credit_balance ?? '—';
+      document.getElementById('modalRegistered').textContent = fmtDate(u.created_at);
+      document.getElementById('modalRoleBadge').innerHTML    = roleBadgeHtml(role);
+      document.getElementById('modalStatus').innerHTML       = statusBadgeHtml(active);
+
+      // Fetch case history dynamically
+      const histEl = document.getElementById('modalCaseHistory');
+      histEl.innerHTML = '<span class="text-gray-500"><i class="fa-solid fa-spinner fa-spin mr-1"></i> Loading cases…</span>';
+      
+      const secret = getAdminSecret();
+      fetch(`/api/v1/cases/history?user_id=${u.id}`, {
+        headers: { 'x-admin-secret': secret }
+      })
+      .then(res => res.json())
+      .then(data => {
+        const cases = data.cases || [];
+        if (cases.length === 0) {
+          histEl.textContent = 'No cases recorded for this user yet.';
+          return;
+        }
+        histEl.innerHTML = cases.map(c => `
+          <div class="py-2 border-b border-gray-800 last:border-0 flex items-center justify-between">
+            <div>
+              <span class="font-semibold text-emerald-400">${c.case_ref}</span>
+              <span class="ml-2 text-white">${c.title || 'Untitled Case'}</span>
+            </div>
+            <span class="text-[11px] text-gray-500">${fmtDate(c.last_updated_at || c.created_at)}</span>
+          </div>
+        `).join('');
+      })
+      .catch(err => {
+        histEl.textContent = 'Unable to load case history.';
+      });
+
+      document.getElementById('userModal').classList.add('open');
+    }
+
+    function closeUserModal(event) {
+      if (!event || event.target === document.getElementById('userModal')) {
+        document.getElementById('userModal').classList.remove('open');
+      }
+    }
+
+    // ── WhatsApp Gateway Panel ────────────────────────────────────────
     let qrPollInterval = null;
-
-    // Persist gateway settings in localStorage
-    const savedGwUrl = localStorage.getItem('tuna_gateway_url');
+    const savedGwUrl    = localStorage.getItem('tuna_gateway_url');
     const savedGwSecret = localStorage.getItem('tuna_gateway_secret');
-    if (savedGwUrl) document.getElementById('gatewayUrl').value = savedGwUrl;
+    if (savedGwUrl)    document.getElementById('gatewayUrl').value    = savedGwUrl;
     if (savedGwSecret) document.getElementById('gatewaySecret').value = savedGwSecret;
 
     function getGatewayConfig() {
-      const url = document.getElementById('gatewayUrl').value.trim().replace(/\/$/, '');
+      const url    = document.getElementById('gatewayUrl').value.trim().replace(/\/$/, '');
       const secret = document.getElementById('gatewaySecret').value.trim() || 'tuna-ai-uganda-secret-2026';
-      localStorage.setItem('tuna_gateway_url', url);
+      localStorage.setItem('tuna_gateway_url',    url);
       localStorage.setItem('tuna_gateway_secret', secret);
       return { url, secret };
     }
@@ -455,21 +991,15 @@
     async function fetchQR() {
       const { url, secret } = getGatewayConfig();
       if (!url) return;
-
-      const qrImage = document.getElementById('qrImage');
-      const qrSpinner = document.getElementById('qrSpinner');
-      const qrOnlineMsg = document.getElementById('qrOnlineMsg');
-
+      const qrImage    = document.getElementById('qrImage');
+      const qrSpinner  = document.getElementById('qrSpinner');
+      const qrOnlineMsg= document.getElementById('qrOnlineMsg');
       try {
-        // First check status via JSON
         const res = await fetch(`${url}/api/v1/internal/qr?secret=${encodeURIComponent(secret)}`);
         const contentType = res.headers.get('content-type') || '';
-
-        if (contentType.includes('image/png')) {
-          // QR image returned
+        if (contentType.includes('image/png') || contentType.includes('image/')) {
           const blob = await res.blob();
-          const objectUrl = URL.createObjectURL(blob);
-          qrImage.src = objectUrl;
+          qrImage.src = URL.createObjectURL(blob);
           qrImage.classList.remove('hidden');
           qrSpinner.classList.add('hidden');
           qrOnlineMsg.classList.add('hidden');
@@ -481,7 +1011,7 @@
             qrSpinner.classList.add('hidden');
             qrOnlineMsg.classList.remove('hidden');
             setWaStatus('online');
-            clearInterval(qrPollInterval); // stop polling once connected
+            clearInterval(qrPollInterval);
           } else {
             qrSpinner.classList.remove('hidden');
             qrImage.classList.add('hidden');
@@ -490,7 +1020,7 @@
           }
         }
       } catch (err) {
-        showGatewayAlert('Cannot reach gateway: ' + err.message, 'error');
+        showAlert('gatewayAlertBox', 'Cannot reach gateway: ' + err.message, 'error');
       }
     }
 
@@ -502,8 +1032,8 @@
 
     async function resetGatewaySession() {
       const { url, secret } = getGatewayConfig();
-      if (!url) { showGatewayAlert('Enter the Gateway URL first', 'error'); return; }
-      showGatewayAlert('Resetting session...', 'info');
+      if (!url) { showAlert('gatewayAlertBox', 'Enter the Gateway URL first', 'error'); return; }
+      showAlert('gatewayAlertBox', 'Resetting session…', 'info');
       try {
         const res = await fetch(`${url}/api/v1/internal/reset-session`, {
           method: 'POST',
@@ -511,32 +1041,18 @@
         });
         const data = await res.json();
         if (data.success) {
-          showGatewayAlert('Session reset! QR will appear in ~3 seconds...', 'success');
+          showAlert('gatewayAlertBox', 'Session reset! QR will appear in ~3 seconds…', 'success');
           setTimeout(loadQR, 3500);
         } else {
-          showGatewayAlert(data.error || 'Reset failed', 'error');
+          showAlert('gatewayAlertBox', data.error || 'Reset failed', 'error');
         }
       } catch (err) {
-        showGatewayAlert('Cannot reach gateway: ' + err.message, 'error');
+        showAlert('gatewayAlertBox', 'Cannot reach gateway: ' + err.message, 'error');
       }
     }
 
-    function showGatewayAlert(msg, type) {
-      const box = document.getElementById('gatewayAlertBox');
-      box.textContent = msg;
-      box.className = type === 'success'
-        ? 'text-xs p-3 rounded-lg bg-emerald-950/80 text-emerald-300 border border-emerald-800'
-        : type === 'info'
-        ? 'text-xs p-3 rounded-lg bg-blue-950/80 text-blue-300 border border-blue-800'
-        : 'text-xs p-3 rounded-lg bg-red-950/80 text-red-300 border border-red-800';
-      box.classList.remove('hidden');
-    }
-
-    // Auto-load QR if gateway URL was previously saved
-    if (savedGwUrl) loadQR();
-
-    // Initial load
-    loadKnowledgeDocs();
+    // ── Bootstrapping ────────────────────────────────────────────────
+    checkExistingSession();
 
   </script>
 </body>

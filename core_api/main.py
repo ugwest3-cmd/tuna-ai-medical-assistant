@@ -5,6 +5,8 @@ Includes:
 - Diagnostic Lab & Scan Result Vision Interpreter (Groq Llama-3.2-Vision)
 - PesaPal v3 UGX Billing & IPN Webhook
 - Interactive Admin Knowledge Base Portal (/admin) for PDF guideline uploads
+- Case history endpoint for HISTORY command in WhatsApp gateway
+- Admin user listing endpoint
 """
 import os
 import shutil
@@ -42,6 +44,9 @@ class QueryRequest(BaseModel):
     user_id: str
     phone: str
     prompt: str
+    user_name: Optional[str] = ""
+    user_role: Optional[str] = "professional"
+    case_id: Optional[str] = None
 
 class LabInterpretRequest(BaseModel):
     user_id: str
@@ -59,6 +64,9 @@ class CreateOrderRequest(BaseModel):
 class TestQueryRequest(BaseModel):
     prompt: str
 
+class AdminVerifyRequest(BaseModel):
+    secret: str
+
 # -------------------------------------------------------------
 # Security Dependencies
 # -------------------------------------------------------------
@@ -71,6 +79,14 @@ async def verify_admin_secret(x_admin_secret: Optional[str] = Header(None)):
     if x_admin_secret != settings.ADMIN_SECRET:
         raise HTTPException(status_code=401, detail="Unauthorized: Invalid admin secret key")
     return True
+
+async def verify_admin_or_gateway_secret(
+    x_secret: Optional[str] = Header(None),
+    x_admin_secret: Optional[str] = Header(None)
+):
+    if x_secret == settings.INTERNAL_GATEWAY_SECRET or x_admin_secret == settings.ADMIN_SECRET:
+        return True
+    raise HTTPException(status_code=401, detail="Unauthorized: Invalid secret key")
 
 # -------------------------------------------------------------
 # General Endpoints
@@ -98,6 +114,7 @@ async def handle_clinical_query(
     Primary endpoint for processing clinical queries from WhatsApp.
     Deducts 1 credit atomically and executes vector search + Groq Llama-3.3 completion.
     Output is strictly formatted per Uganda Clinical Guidelines with zero page citations.
+    Supports personalized responses via user_name and role-differentiated prompting via user_role.
     """
     # 1. Atomic credit deduction check
     deducted = rag_engine.supabase.rpc("deduct_credit", {
@@ -111,9 +128,15 @@ async def handle_clinical_query(
             "message": "⚠️ *Insufficient Balance:* You have 0 credits remaining.\n\nReply *BUY* to view top-up packages."
         }
 
-    # 2. Execute RAG pipeline
+    # 2. Execute RAG pipeline with user context
     try:
-        result = await rag_engine.generate_response(payload.user_id, payload.prompt)
+        result = await rag_engine.generate_response(
+            user_id=payload.user_id,
+            prompt=payload.prompt,
+            user_name=payload.user_name or "",
+            user_role=payload.user_role or "professional",
+            case_id=payload.case_id
+        )
         return {
             "status": "success",
             "response": result["response"],
@@ -237,6 +260,17 @@ async def pesapal_ipn_webhook(request: Request):
         print(f"[IPN Error] {e}")
         return {"status": "error", "message": str(e)}
 
+@app.get("/api/v1/cases/history")
+async def get_case_history(user_id: str, _authorized: bool = Depends(verify_admin_or_gateway_secret)):
+    """Returns a user's recent cases for the HISTORY / CASES command."""
+    try:
+        cases = rag_engine.supabase.table("cases").select(
+            "id, case_ref, title, status, created_at, last_updated_at"
+        ).eq("user_id", user_id).order("last_updated_at", desc=True).limit(10).execute()
+        return {"cases": cases.data or []}
+    except Exception as e:
+        return {"cases": [], "error": str(e)}
+
 # -------------------------------------------------------------
 # Admin Knowledge Portal & Document Upload
 # -------------------------------------------------------------
@@ -245,15 +279,24 @@ async def admin_portal_page(request: Request):
     """Renders the interactive web Admin Portal."""
     return templates.TemplateResponse("admin.html", {"request": request})
 
+@app.post("/api/v1/admin/verify-auth")
+async def verify_admin_auth(payload: AdminVerifyRequest):
+    """Validates the admin secret key before granting portal session access."""
+    if not payload.secret or payload.secret != settings.ADMIN_SECRET:
+        raise HTTPException(status_code=401, detail="Invalid admin credentials")
+    return {"authenticated": True, "message": "Access granted"}
+
 @app.post("/api/v1/admin/upload-doc")
 async def admin_upload_document(
     file: UploadFile = File(...),
     title: str = Form(...),
     edition: Optional[str] = Form("Standard"),
+    doc_type: str = Form("professional"),
     _authorized: bool = Depends(verify_admin_secret)
 ):
     """
     Receives PDF from Admin Portal, chunks text, computes embeddings, and stores in Supabase pgvector.
+    doc_type: 'professional' (UCG clinical protocols) or 'student' (teaching/learning materials).
     """
     if not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files are supported.")
@@ -293,7 +336,8 @@ async def admin_upload_document(
                     "page_number": page_idx + 1,
                     "content": chunk_str,
                     "token_count": len(chunk_words),
-                    "embedding": embedding
+                    "embedding": embedding,
+                    "doc_type": doc_type
                 })
 
                 if len(records_to_insert) >= 40:
@@ -309,6 +353,7 @@ async def admin_upload_document(
             "status": "success",
             "title": title,
             "edition": edition,
+            "doc_type": doc_type,
             "pages_processed": total_pages,
             "chunks_count": total_chunks
         }
@@ -321,36 +366,46 @@ async def admin_upload_document(
 
 @app.get("/api/v1/admin/knowledge-stats")
 async def admin_knowledge_stats(_authorized: bool = Depends(verify_admin_secret)):
-    """Fetches knowledge statistics and indexed document summaries."""
+    """Fetches knowledge statistics and indexed document summaries with doc_type breakdown."""
     try:
         # Get count of total chunks
         chunks_res = rag_engine.supabase.table("medical_knowledge").select("id", count="exact").execute()
         total_chunks = chunks_res.count or 0
+
+        # Get count of professional vs student chunks
+        chunks_prof_res = rag_engine.supabase.table("medical_knowledge").select("id", count="exact").eq("doc_type", "professional").execute()
+        chunks_prof = chunks_prof_res.count or 0
+
+        chunks_stud_res = rag_engine.supabase.table("medical_knowledge").select("id", count="exact").eq("doc_type", "student").execute()
+        chunks_stud = chunks_stud_res.count or 0
 
         # Get count of users
         users_res = rag_engine.supabase.table("users").select("id", count="exact").execute()
         total_users = users_res.count or 0
 
         # Fetch unique documents
-        docs_res = rag_engine.supabase.table("medical_knowledge").select("document_title, edition").execute()
+        docs_res = rag_engine.supabase.table("medical_knowledge").select("document_title, edition, doc_type").execute()
         raw_docs = docs_res.data or []
 
         doc_map: Dict[str, Dict[str, Any]] = {}
         for r in raw_docs:
             title = r.get("document_title") or "Untitled Document"
             edition = r.get("edition") or "Standard"
+            doc_type = r.get("doc_type") or "professional"
             if title not in doc_map:
-                doc_map[title] = {"title": title, "edition": edition, "chunks": 0}
+                doc_map[title] = {"title": title, "edition": edition, "doc_type": doc_type, "chunks": 0}
             doc_map[title]["chunks"] += 1
 
         return {
             "total_chunks": total_chunks,
+            "professional_chunks": chunks_prof,
+            "student_chunks": chunks_stud,
             "total_users": total_users,
             "documents": list(doc_map.values())
         }
     except Exception as e:
         print(f"[Stats Error] {e}")
-        return {"total_chunks": 0, "total_users": 0, "documents": []}
+        return {"total_chunks": 0, "professional_chunks": 0, "student_chunks": 0, "total_users": 0, "documents": []}
 
 @app.delete("/api/v1/admin/delete-doc")
 async def admin_delete_document(title: str, _authorized: bool = Depends(verify_admin_secret)):
@@ -369,6 +424,21 @@ async def admin_test_query(payload: TestQueryRequest, _authorized: bool = Depend
         return {"response": result["response"]}
     except Exception as e:
         return {"response": f"Query Error: {str(e)}"}
+
+# -------------------------------------------------------------
+# Admin: User Management
+# -------------------------------------------------------------
+@app.get("/api/v1/admin/users")
+async def admin_list_users(_authorized: bool = Depends(verify_admin_secret)):
+    """Admin: list all registered users with roles."""
+    try:
+        users = rag_engine.supabase.table("users").select(
+            "id, whatsapp_id, name, profession, role, practicing_number, "
+            "credit_balance, status, onboarding_complete, created_at"
+        ).order("created_at", desc=True).limit(200).execute()
+        return {"users": users.data or []}
+    except Exception as e:
+        return {"users": [], "error": str(e)}
 
 if __name__ == "__main__":
     import uvicorn

@@ -24,7 +24,13 @@ module.exports = async (req, res) => {
         return res.status(405).json({ error: 'Method Not Allowed' });
     }
 
-    const { title, edition = '2023', chunks } = req.body || {};
+    const adminSecret = req.headers['x-admin-secret'];
+    const expectedSecret = process.env.ADMIN_SECRET || 'tuna-admin-uganda-pass';
+    if (!adminSecret || adminSecret !== expectedSecret) {
+        return res.status(401).json({ error: 'Unauthorized: Invalid admin credentials' });
+    }
+
+    const { title, edition = '2023', doc_type = 'professional', chunks } = req.body || {};
 
     if (!title || !chunks || !Array.isArray(chunks) || chunks.length === 0) {
         return res.status(400).json({ error: 'Missing title or chunks array' });
@@ -36,7 +42,8 @@ module.exports = async (req, res) => {
             edition: edition,
             page_number: c.page || 1,
             content: c.content,
-            token_count: c.content.split(/\s+/).length
+            token_count: c.content.split(/\s+/).length,
+            doc_type: doc_type
         }));
 
         const { data, error } = await supabase

@@ -101,6 +101,14 @@
           </div>
 
           <div>
+            <label class="block text-xs font-medium text-gray-300 mb-1">Target Audience / Material Type</label>
+            <select id="docType" class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-xs text-white focus:border-emerald-500 outline-none">
+              <option value="professional">Professional Guidelines (Doctors, Nurses, Clinical Officers)</option>
+              <option value="student">Student Learning Material (Medical & Nursing Learners)</option>
+            </select>
+          </div>
+
+          <div>
             <label class="block text-xs font-medium text-gray-300 mb-1">Select PDF Guidelines File</label>
             <div id="dropZone" class="border-2 border-dashed border-gray-700 hover:border-emerald-500/60 rounded-xl p-6 text-center cursor-pointer transition bg-gray-900/50">
               <i class="fa-solid fa-file-pdf text-3xl text-emerald-400/80 mb-2"></i>
@@ -299,6 +307,7 @@
       const file = fileInput.files[0];
       const title = document.getElementById('docTitle').value.trim() || 'Uganda Clinical Guidelines 2023';
       const edition = document.getElementById('docEdition').value.trim() || '2023 MoH Edition';
+      const docType = document.getElementById('docType')?.value || 'professional';
 
       submitBtn.disabled = true;
       progressContainer.classList.remove('hidden');
@@ -344,7 +353,7 @@
 
           // Stream batches of 25 chunks (small ~15 KB payloads well under Vercel limits)
           if (pendingChunks.length >= 25) {
-            await sendBatch(title, edition, pendingChunks);
+            await sendBatch(title, edition, docType, pendingChunks);
             totalChunksSent += pendingChunks.length;
             pendingChunks = [];
           }
@@ -352,7 +361,7 @@
 
         // Send final remaining chunks
         if (pendingChunks.length > 0) {
-          await sendBatch(title, edition, pendingChunks);
+          await sendBatch(title, edition, docType, pendingChunks);
           totalChunksSent += pendingChunks.length;
         }
 
@@ -373,11 +382,11 @@
       }
     });
 
-    async function sendBatch(title, edition, chunks) {
+    async function sendBatch(title, edition, docType, chunks) {
       const res = await fetch('/api/ingest-chunks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, edition, chunks })
+        body: JSON.stringify({ title, edition, doc_type: docType, chunks })
       });
       if (!res.ok) {
         const errorText = await res.text();

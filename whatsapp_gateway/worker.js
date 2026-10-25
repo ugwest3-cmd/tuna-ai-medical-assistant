@@ -1,10 +1,14 @@
 /**
  * Tuna AI WhatsApp Gateway Worker - Uganda Healthcare Edition
  * Supports:
- * 1. Clinical Queries (Groq Llama-3.3-70B via Core API)
- * 2. Diagnostic Lab & Scan Result Vision (Interprets photos of lab slips, CBCs, RDTs, scans)
- * 3. Mobile Money Top-Ups (PesaPal v3 / UGX)
- * 4. 8-digit Pairing Code support for headless Railway deployments
+ * 1. Multi-step onboarding flow (name → profession → practicing number)
+ * 2. Clinical Queries (Groq Llama-3.3-70B via Core API)
+ * 3. Case context management (reuse open cases within 2 hours)
+ * 4. Diagnostic Lab & Scan Result Vision (Interprets photos of lab slips, CBCs, RDTs, scans)
+ * 5. Mobile Money Top-Ups (PesaPal v3 / UGX)
+ * 6. HISTORY / CASES command for reviewing past cases
+ * 7. Response chunking for long AI messages (≤ 900 chars per WhatsApp message)
+ * 8. 8-digit Pairing Code support for headless Railway deployments
  */
 require('dotenv').config();
 const {
@@ -68,6 +72,141 @@ function clearSession() {
     } catch (err) {
         console.error('[Worker] Failed to clear session:', err.message);
     }
+}
+
+// -----------------------------------------------------------------------
+// UTILITY: sendChunked
+// Sends long AI responses in ≤ 900-character chunks with a delay between
+// messages to avoid WhatsApp rate-limiting and improve readability.
+// -----------------------------------------------------------------------
+async function sendChunked(jid, text, socket) {
+    const MAX_CHUNK = 900;
+    const DELAY_MS = 1200;
+
+    if (!text || text.length <= MAX_CHUNK) {
+        // Short enough — send as a single message
+        await socket.sendMessage(jid, { text });
+        return;
+    }
+
+    // Split on sentence / newline boundaries to form natural chunks
+    const chunks = [];
+    let current = '';
+
+    // Split the text into segments at natural break points
+    const segments = text.split(/(?<=\. )|(?<=\n)/);
+
+    for (const segment of segments) {
+        if ((current + segment).length <= MAX_CHUNK) {
+            current += segment;
+        } else {
+            if (current.trim()) chunks.push(current.trim());
+            // Handle a segment that is itself longer than MAX_CHUNK
+            if (segment.length > MAX_CHUNK) {
+                const words = segment.split(' ');
+                let wordChunk = '';
+                for (const word of words) {
+                    if ((wordChunk + ' ' + word).trim().length <= MAX_CHUNK) {
+                        wordChunk = (wordChunk + ' ' + word).trim();
+                    } else {
+                        if (wordChunk) chunks.push(wordChunk);
+                        wordChunk = word;
+                    }
+                }
+                if (wordChunk) current = wordChunk;
+            } else {
+                current = segment;
+            }
+        }
+    }
+    if (current.trim()) chunks.push(current.trim());
+
+    // Send each chunk with a short delay
+    for (const chunk of chunks) {
+        await socket.sendMessage(jid, { text: chunk });
+        await new Promise(resolve => setTimeout(resolve, DELAY_MS));
+    }
+}
+
+// -----------------------------------------------------------------------
+// UTILITY: getOrCreateActiveCase
+// Checks if the user has an open case updated within the last 2 hours.
+// If so, reuses it. Otherwise creates a fresh case with a generated ref.
+// Returns { case_id, case_ref }
+// -----------------------------------------------------------------------
+async function getOrCreateActiveCase(userId, messageText) {
+    const TWO_HOURS_AGO = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+
+    // Check for an existing open case updated within the last 2 hours
+    const { data: existingCases } = await supabase
+        .from('cases')
+        .select('id, case_ref, last_updated_at')
+        .eq('user_id', userId)
+        .eq('status', 'open')
+        .gte('last_updated_at', TWO_HOURS_AGO)
+        .order('last_updated_at', { ascending: false })
+        .limit(1);
+
+    if (existingCases && existingCases.length > 0) {
+        const activeCase = existingCases[0];
+        // Refresh the timestamp so the 2-hour window resets
+        await supabase
+            .from('cases')
+            .update({ last_updated_at: new Date().toISOString() })
+            .eq('id', activeCase.id);
+        return { case_id: activeCase.id, case_ref: activeCase.case_ref };
+    }
+
+    // No recent active case — create a new one
+    // Generate case_ref locally: TUN-YYYY-XXXXX (last 5 digits of timestamp for uniqueness)
+    const year = new Date().getFullYear();
+    const uniqueSuffix = String(Date.now()).slice(-5);
+    const caseRef = `TUN-${year}-${uniqueSuffix}`;
+
+    // Use the first 80 chars of the message as the case title
+    const caseTitle = (messageText || '').substring(0, 80).trim() || null;
+
+    const { data: newCase, error: caseErr } = await supabase
+        .from('cases')
+        .insert({
+            user_id: userId,
+            case_ref: caseRef,
+            title: caseTitle,
+            status: 'open'
+        })
+        .select()
+        .single();
+
+    if (caseErr) {
+        console.error('[Worker] Failed to create case:', caseErr.message);
+        return { case_id: null, case_ref: null };
+    }
+
+    return { case_id: newCase.id, case_ref: newCase.case_ref };
+}
+
+// -----------------------------------------------------------------------
+// UTILITY: formatCaseHistory
+// Formats a list of cases into a WhatsApp-friendly message string.
+// -----------------------------------------------------------------------
+function formatCaseHistory(cases) {
+    if (!cases || cases.length === 0) {
+        return '📋 *Your Case History*\n\nNo cases found. Send a patient description to start a new case.';
+    }
+
+    const lines = cases.map((c, i) => {
+        const title = c.title ? c.title.substring(0, 40) : 'Untitled';
+        const date = c.last_updated_at
+            ? new Date(c.last_updated_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+            : '—';
+        return `${i + 1}. ${c.case_ref} — ${title} (${date})`;
+    });
+
+    return (
+        '📋 *Your Case History*\n\n' +
+        lines.join('\n') +
+        '\n\nReply the case number or send a new patient description.'
+    );
 }
 
 async function startWhatsAppWorker() {
@@ -160,18 +299,28 @@ async function startWhatsAppWorker() {
         const cleanText = (text || "").trim();
 
         try {
+            // ----------------------------------------------------------------
             // 1. Fetch or auto-provision user in Supabase
+            // ----------------------------------------------------------------
             let { data: user } = await supabase
                 .from('users')
                 .select('*')
                 .eq('whatsapp_id', remoteJid)
                 .single();
 
+            // ----------------------------------------------------------------
+            // ONBOARDING STEP 0: Brand-new user — insert and start onboarding
+            // ----------------------------------------------------------------
             if (!user) {
                 console.log(`[Worker] Provisioning new Ugandan health worker: ${remoteJid}`);
                 const { data: newUser, error: createErr } = await supabase
                     .from('users')
-                    .insert({ whatsapp_id: remoteJid, credit_balance: 20 })
+                    .insert({
+                        whatsapp_id: remoteJid,
+                        credit_balance: 20,   // initial trial credits; finalised after onboarding
+                        onboarding_step: 1,
+                        onboarding_complete: false
+                    })
                     .select()
                     .single();
 
@@ -180,48 +329,177 @@ async function startWhatsAppWorker() {
                     return;
                 }
 
+                // Welcome message — ask for name
+                await sock.sendMessage(remoteJid, {
+                    text:
+                        '🩺 *Welcome to Tuna AI Medical Assistant (Uganda)* 🇺🇬\n\n' +
+                        'Your AI-powered clinical decision support tool, trained on Uganda Clinical Guidelines (UCG).\n\n' +
+                        'Let\'s set up your profile in 3 quick steps.\n\n' +
+                        '👤 *Step 1 of 3:* What is your full name?'
+                });
+                return;
+            }
+
+            // ----------------------------------------------------------------
+            // ONBOARDING STEP 1: Awaiting name
+            // ----------------------------------------------------------------
+            if (user.onboarding_step === 1) {
+                if (!cleanText) return; // ignore empty messages during onboarding
+
+                await supabase
+                    .from('users')
+                    .update({ name: cleanText, onboarding_step: 2, updated_at: new Date().toISOString() })
+                    .eq('id', user.id);
+
+                await sock.sendMessage(remoteJid, {
+                    text:
+                        `✅ Nice to meet you, *${cleanText}*!\n\n` +
+                        '🏥 *Step 2 of 3:* What is your profession?\n\n' +
+                        'Reply with a number:\n' +
+                        '*1* — Doctor\n' +
+                        '*2* — Nurse / Midwife / Clinical Officer\n' +
+                        '*3* — Medical Student\n' +
+                        '*4* — Other Healthcare Worker'
+                });
+                return;
+            }
+
+            // ----------------------------------------------------------------
+            // ONBOARDING STEP 2: Awaiting profession
+            // ----------------------------------------------------------------
+            if (user.onboarding_step === 2) {
+                if (!cleanText) return;
+
+                let profession = '';
+                let role = 'professional'; // default role
+
+                switch (cleanText.trim()) {
+                    case '1':
+                        profession = 'Doctor';
+                        role = 'professional';
+                        break;
+                    case '2':
+                        profession = 'Nurse / Midwife / Clinical Officer';
+                        role = 'professional';
+                        break;
+                    case '3':
+                        profession = 'Medical Student';
+                        role = 'student';
+                        break;
+                    case '4':
+                        profession = 'Other Healthcare Worker';
+                        role = 'professional';
+                        break;
+                    default:
+                        // Accept free-text profession input too
+                        profession = cleanText;
+                        role = 'professional';
+                }
+
+                await supabase
+                    .from('users')
+                    .update({
+                        profession,
+                        role,
+                        onboarding_step: 3,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('id', user.id);
+
+                await sock.sendMessage(remoteJid, {
+                    text:
+                        `✅ Profession saved: *${profession}*\n\n` +
+                        '🪪 *Step 3 of 3:* Please enter your practicing/registration number ' +
+                        '(e.g. UMDPC number, Nursing Council number, or Student ID).\n\n' +
+                        '_Reply_ *SKIP* _if you do not have one yet._'
+                });
+                return;
+            }
+
+            // ----------------------------------------------------------------
+            // ONBOARDING STEP 3: Awaiting practicing number
+            // ----------------------------------------------------------------
+            if (user.onboarding_step === 3) {
+                if (!cleanText) return;
+
+                const practicingNumber = cleanText.toUpperCase() === 'SKIP' ? null : cleanText;
+
+                // Grant trial credits transaction record now that onboarding is complete
                 await supabase.from('credit_transactions').insert({
-                    user_id: newUser.id,
+                    user_id: user.id,
                     amount: 20,
                     tx_type: 'trial_grant',
-                    notes: 'Initial free trial credits'
+                    notes: 'Initial free trial credits — onboarding complete'
                 });
 
+                // Complete onboarding
+                await supabase
+                    .from('users')
+                    .update({
+                        practicing_number: practicingNumber,
+                        onboarding_step: 4,
+                        onboarding_complete: true,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('id', user.id);
+
+                // Fetch fresh user data to personalise the welcome message
+                const { data: freshUser } = await supabase
+                    .from('users')
+                    .select('name, profession, role, credit_balance')
+                    .eq('id', user.id)
+                    .single();
+
+                const firstName = (freshUser?.name || 'there').split(' ')[0];
+                const profession = freshUser?.profession || 'Healthcare Provider';
+                const credits = freshUser?.credit_balance || 20;
+
                 await sock.sendMessage(remoteJid, {
-                    text: "🩺 *Welcome to Tuna AI Medical Assistant (Uganda)* 🇺🇬\n\n" +
-                          "You have *20 Complimentary Clinical Query Credits*.\n\n" +
-                          "• *Clinical Guidance:* Send patient symptoms or condition for step-by-step Uganda Clinical Guidelines (UCG) treatment & dosages.\n" +
-                          "• *Lab & Scan Reading:* Send a photo of a lab slip, blood test, RDT strip, or ultrasound report for instant AI interpretation.\n" +
-                          "• *Account & Top-Ups:* Reply *BUY* for Mobile Money top-ups.\n\n" +
-                          "⚠️ _For healthcare providers, clinical officers, nurses & interns._"
+                    text:
+                        `🎉 *Welcome aboard, ${firstName}!*\n\n` +
+                        `You are registered as a *${profession}* on Tuna AI Uganda.\n\n` +
+                        `💳 You have *${credits} Free Clinical Query Credits* to get started.\n\n` +
+                        `*What you can do:*\n` +
+                        `• 🩺 Send a patient case for step-by-step UCG treatment protocol\n` +
+                        `• 🔬 Send a photo of a lab slip or scan for AI interpretation\n` +
+                        `• 📋 Reply *HISTORY* to view your past cases\n` +
+                        `• 💳 Reply *BUY* for Mobile Money top-up packages\n\n` +
+                        `_Send your first clinical query now!_`
                 });
                 return;
             }
 
+            // ----------------------------------------------------------------
+            // ONBOARDING COMPLETE — proceed to normal message handling below
+            // ----------------------------------------------------------------
+
+            // 2. Suspension check
             if (user.status === 'suspended') {
                 await sock.sendMessage(remoteJid, {
-                    text: "⛔ Your Tuna AI account is currently suspended. Please contact support."
+                    text: '⛔ Your Tuna AI account is currently suspended. Please contact support.'
                 });
                 return;
             }
 
-            // 2. Handle BUY / Pricing
-            if (cleanText.toUpperCase() === "BUY" || cleanText.toUpperCase() === "TOPUP" || cleanText.toUpperCase() === "PRICING") {
+            // 3. Handle BUY / Pricing
+            if (cleanText.toUpperCase() === 'BUY' || cleanText.toUpperCase() === 'TOPUP' || cleanText.toUpperCase() === 'PRICING') {
                 await sock.sendMessage(remoteJid, {
-                    text: `💳 *Tuna AI Clinical Top-Up Packages (Uganda)*\n\n` +
-                          `Current Balance: *${user.credit_balance} Credits*\n\n` +
-                          `Reply with your choice:\n` +
-                          `*1* — 100 Credits (10,000 UGX)\n` +
-                          `*2* — 300 Credits (25,000 UGX)\n` +
-                          `*3* — 1,000 Credits (70,000 UGX)\n\n` +
-                          `_Accepted via MTN MoMo, Airtel Money & Visa/Mastercard._`
+                    text:
+                        `💳 *Tuna AI Clinical Top-Up Packages (Uganda)*\n\n` +
+                        `Current Balance: *${user.credit_balance} Credits*\n\n` +
+                        `Reply with your choice:\n` +
+                        `*1* — 100 Credits (10,000 UGX)\n` +
+                        `*2* — 300 Credits (25,000 UGX)\n` +
+                        `*3* — 1,000 Credits (70,000 UGX)\n\n` +
+                        `_Accepted via MTN MoMo, Airtel Money & Visa/Mastercard._`
                 });
                 return;
             }
 
-            // 3. Handle Package Selection
-            if (["1", "2", "3"].includes(cleanText)) {
-                await sock.sendMessage(remoteJid, { text: "⏳ Generating your secure PesaPal payment link..." });
+            // 4. Handle Package Selection (1 / 2 / 3 for top-up)
+            // Note: "1"/"2"/"3" during onboarding are intercepted above; this only runs post-onboarding.
+            if (['1', '2', '3'].includes(cleanText) && user.onboarding_complete) {
+                await sock.sendMessage(remoteJid, { text: '⏳ Generating your secure PesaPal payment link...' });
                 try {
                     const orderRes = await axios.post(
                         `${CORE_API_URL}/api/v1/payments/create-order`,
@@ -238,29 +516,54 @@ async function startWhatsAppWorker() {
 
                     const redirectUrl = orderRes.data.redirect_url;
                     await sock.sendMessage(remoteJid, {
-                        text: `🔗 *Secure PesaPal Checkout:*\n${redirectUrl}\n\n` +
-                              `Complete with MTN or Airtel Money. Credits will update automatically!`
+                        text:
+                            `🔗 *Secure PesaPal Checkout:*\n${redirectUrl}\n\n` +
+                            `Complete with MTN or Airtel Money. Credits will update automatically!`
                     });
                 } catch (orderErr) {
                     console.error('[Worker] Error generating payment link:', orderErr.message);
                     await sock.sendMessage(remoteJid, {
-                        text: "❌ Failed to generate checkout link. Please try again in a moment."
+                        text: '❌ Failed to generate checkout link. Please try again in a moment.'
                     });
                 }
                 return;
             }
 
-            // 4. Check Credit Balance
+            // 5. Handle HISTORY / CASES command
+            if (cleanText.toUpperCase() === 'HISTORY' || cleanText.toUpperCase() === 'CASES') {
+                try {
+                    const historyRes = await axios.get(
+                        `${CORE_API_URL}/api/v1/cases/history`,
+                        {
+                            params: { user_id: user.id },
+                            headers: { 'x-secret': INTERNAL_SECRET },
+                            timeout: 15000
+                        }
+                    );
+                    const caseList = historyRes.data.cases || [];
+                    await sock.sendMessage(remoteJid, { text: formatCaseHistory(caseList) });
+                } catch (histErr) {
+                    console.error('[Worker] Error fetching case history:', histErr.message);
+                    await sock.sendMessage(remoteJid, {
+                        text: '⚠️ Could not retrieve your case history. Please try again.'
+                    });
+                }
+                return;
+            }
+
+            // 6. Check Credit Balance
             if (user.credit_balance <= 0) {
                 await sock.sendMessage(remoteJid, {
-                    text: "⚠️ *Out of Credits*\n\nYou have 0 credits remaining. Please reply *BUY* to replenish your balance."
+                    text:
+                        `⚠️ *Out of Credits, ${(user.name || 'there').split(' ')[0]}*\n\n` +
+                        `You have 0 credits remaining. Please reply *BUY* to replenish your balance.`
                 });
                 return;
             }
 
-            // 5. Handle DIAGNOSTIC LAB / SCAN IMAGE UPLOAD
+            // 7. Handle DIAGNOSTIC LAB / SCAN IMAGE UPLOAD
             if (isImage) {
-                await sock.sendMessage(remoteJid, { text: "🔬 *Analyzing laboratory/scan report using Vision AI...*" });
+                await sock.sendMessage(remoteJid, { text: '🔬 *Analyzing laboratory/scan report using Vision AI...*' });
                 await sock.sendPresenceUpdate('composing', remoteJid);
 
                 try {
@@ -293,21 +596,35 @@ async function startWhatsAppWorker() {
                     if (labRes.data.status === 'insufficient_credits') {
                         await sock.sendMessage(remoteJid, { text: labRes.data.message });
                     } else if (labRes.data.response) {
-                        await sock.sendMessage(remoteJid, { text: labRes.data.response });
+                        await sendChunked(remoteJid, labRes.data.response, sock);
                     }
                 } catch (imgErr) {
                     console.error('[Worker] Lab interpretation error:', imgErr.message);
                     await sock.sendMessage(remoteJid, {
-                        text: "⚠️ *Image Analysis Notice:* Could not clearly read the lab report. Ensure good lighting, lay the slip flat, and take a clear photo."
+                        text:
+                            '⚠️ *Image Analysis Notice:* Could not clearly read the lab report. ' +
+                            'Ensure good lighting, lay the slip flat, and take a clear photo.'
                     });
                 }
                 return;
             }
 
-            // 6. Handle TEXT CLINICAL QUERY
+            // 8. Handle TEXT CLINICAL QUERY
             if (!cleanText) return;
 
             await sock.sendPresenceUpdate('composing', remoteJid);
+
+            // Get or create an active case for this session
+            let activeCaseId = null;
+            let activeCaseRef = null;
+            try {
+                const caseData = await getOrCreateActiveCase(user.id, cleanText);
+                activeCaseId = caseData.case_id;
+                activeCaseRef = caseData.case_ref;
+            } catch (caseErr) {
+                console.error('[Worker] Case management error (non-fatal):', caseErr.message);
+                // Continue without case tracking if it fails
+            }
 
             try {
                 const apiRes = await axios.post(
@@ -315,7 +632,10 @@ async function startWhatsAppWorker() {
                     {
                         user_id: user.id,
                         phone: remoteJid,
-                        prompt: cleanText
+                        prompt: cleanText,
+                        user_name: user.name || '',
+                        user_role: user.role || 'professional',
+                        case_id: activeCaseId
                     },
                     {
                         headers: { 'x-secret': INTERNAL_SECRET },
@@ -326,12 +646,16 @@ async function startWhatsAppWorker() {
                 if (apiRes.data.status === 'insufficient_credits') {
                     await sock.sendMessage(remoteJid, { text: apiRes.data.message });
                 } else if (apiRes.data.response) {
-                    await sock.sendMessage(remoteJid, { text: apiRes.data.response });
+                    // Send chunked response; prepend case reference for context
+                    const responseText = activeCaseRef
+                        ? `📁 *Case ${activeCaseRef}*\n\n${apiRes.data.response}`
+                        : apiRes.data.response;
+                    await sendChunked(remoteJid, responseText, sock);
                 }
             } catch (queryErr) {
                 console.error('[Worker] Core API Query error:', queryErr.message);
                 await sock.sendMessage(remoteJid, {
-                    text: "⚠️ *System Notice:* A temporary delay occurred while processing your clinical query. Please re-send."
+                    text: '⚠️ *System Notice:* A temporary delay occurred while processing your clinical query. Please re-send.'
                 });
             }
 

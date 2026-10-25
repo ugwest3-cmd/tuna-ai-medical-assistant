@@ -45,7 +45,7 @@ def chunk_text(text: str, chunk_size: int = CHUNK_SIZE_WORDS, overlap: int = CHU
         chunks.append(" ".join(chunk_words))
     return chunks
 
-def ingest_pdf(pdf_path: str, document_title: str, edition: str = None):
+def ingest_pdf(pdf_path: str, document_title: str, edition: str = None, doc_type: str = "professional"):
     """Parses a medical textbook PDF and embeds chunks into Supabase pgvector."""
     if not os.path.exists(pdf_path):
         print(f"[Ingest Error] File not found: {pdf_path}")
@@ -54,7 +54,7 @@ def ingest_pdf(pdf_path: str, document_title: str, edition: str = None):
     print(f"\n[Ingest] Opening PDF: {pdf_path}")
     doc = fitz.open(pdf_path)
     total_pages = len(doc)
-    print(f"[Ingest] Processing '{document_title}' ({total_pages} pages)...")
+    print(f"[Ingest] Processing '{document_title}' ({total_pages} pages, doc_type='{doc_type}')...")
 
     pending_records: List[Dict[str, Any]] = []
     total_chunks_inserted = 0
@@ -78,6 +78,7 @@ def ingest_pdf(pdf_path: str, document_title: str, edition: str = None):
                 "page_number": page_num,
                 "content": chunk,
                 "token_count": len(chunk.split()),
+                "doc_type": doc_type,
                 "embedding": embedding
             }
             pending_records.append(record)
@@ -106,9 +107,10 @@ def main():
     parser.add_argument("--file", "-f", required=True, help="Path to PDF file")
     parser.add_argument("--title", "-t", required=True, help="Document Title (e.g. 'Uganda Clinical Guidelines 2023')")
     parser.add_argument("--edition", "-e", default="Current", help="Book edition or year")
+    parser.add_argument("--doc-type", "-d", default="professional", choices=["professional", "student"], help="Target audience (professional or student)")
 
     args = parser.parse_args()
-    ingest_pdf(args.file, args.title, args.edition)
+    ingest_pdf(args.file, args.title, args.edition, args.doc_type)
 
 if __name__ == "__main__":
     main()
