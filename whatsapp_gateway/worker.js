@@ -481,13 +481,14 @@ async function startWhatsAppWorker() {
                     text:
                         `🎉 *Welcome aboard, ${firstName}!*\n\n` +
                         `You are registered as a *${profession}* on Tuna AI Uganda.\n\n` +
-                        `💳 You have *${credits} Free Clinical Query Credits* to get started.\n\n` +
+                        `💳 You have *${credits} Free Patient Case Credits* to get started.\n` +
+                        `_(Each credit covers 1 full patient case with unlimited follow-up messages)._\n\n` +
                         `*What you can do:*\n` +
-                        `• 🩺 Send a patient case for step-by-step UCG treatment protocol\n` +
+                        `• 🩺 Send a patient presentation for step-by-step UCG triage & treatment\n` +
                         `• 🔬 Send a photo of a lab slip or scan for AI interpretation\n` +
                         `• 📋 Reply *HISTORY* to view your past cases\n` +
-                        `• 💳 Reply *BUY* for Mobile Money top-up packages\n\n` +
-                        `_Send your first clinical query now!_`
+                        `• 💳 Reply *BUY* to view case top-up packages on our website\n\n` +
+                        `_Send your first patient case now!_`
                 });
                 return;
             }
@@ -504,51 +505,23 @@ async function startWhatsAppWorker() {
                 return;
             }
 
-            // 3. Handle BUY / Pricing
+            // 3. Handle BUY / Pricing / Topup (Direct Web Checkout Link)
             if (cleanText.toUpperCase() === 'BUY' || cleanText.toUpperCase() === 'TOPUP' || cleanText.toUpperCase() === 'PRICING') {
+                const cleanPhone = remoteJid.replace(/[^0-9]/g, '');
+                const topupUrl = `https://getafyalinks.com/tuna-ai?phone=${cleanPhone}#pricing`;
                 await sock.sendMessage(remoteJid, {
                     text:
-                        `💳 *Tuna AI Clinical Top-Up Packages (Uganda)*\n\n` +
-                        `Current Balance: *${user.credit_balance} Credits*\n\n` +
-                        `Reply with your choice:\n` +
-                        `*1* — 100 Credits (10,000 UGX)\n` +
-                        `*2* — 300 Credits (25,000 UGX)\n` +
-                        `*3* — 1,000 Credits (70,000 UGX)\n\n` +
-                        `_Accepted via MTN MoMo, Airtel Money & Visa/Mastercard._`
+                        `💳 *Tuna AI Case Top-Up Packages (Uganda)*\n\n` +
+                        `Current Balance: *${user.credit_balance} Case Credits*\n` +
+                        `_(1 Case Credit covers 1 complete patient case with unlimited follow-ups)_\n\n` +
+                        `👉 *Top up directly on our website:*\n${topupUrl}\n\n` +
+                        `• *10 Cases* — 2,000 UGX *(Starter pack)*\n` +
+                        `• *50 Cases* — 5,000 UGX\n` +
+                        `• *100 Cases* — 10,000 UGX\n` +
+                        `• *300 Cases* — 25,000 UGX\n` +
+                        `• *1,000 Cases* — 70,000 UGX\n\n` +
+                        `_Instant checkout via MTN MoMo, Airtel Money & Visa/Mastercard._`
                 });
-                return;
-            }
-
-            // 4. Handle Package Selection (1 / 2 / 3 for top-up)
-            // Note: "1"/"2"/"3" during onboarding are intercepted above; this only runs post-onboarding.
-            if (['1', '2', '3'].includes(cleanText) && user.onboarding_complete) {
-                await sock.sendMessage(remoteJid, { text: '⏳ Generating your secure PesaPal payment link...' });
-                try {
-                    const orderRes = await axios.post(
-                        `${CORE_API_URL}/api/v1/payments/create-order`,
-                        {
-                            userId: user.id,
-                            phone: remoteJid,
-                            packageTier: cleanText
-                        },
-                        {
-                            headers: { 'x-secret': INTERNAL_SECRET },
-                            timeout: 15000
-                        }
-                    );
-
-                    const redirectUrl = orderRes.data.redirect_url;
-                    await sock.sendMessage(remoteJid, {
-                        text:
-                            `🔗 *Secure PesaPal Checkout:*\n${redirectUrl}\n\n` +
-                            `Complete with MTN or Airtel Money. Credits will update automatically!`
-                    });
-                } catch (orderErr) {
-                    console.error('[Worker] Error generating payment link:', orderErr.message);
-                    await sock.sendMessage(remoteJid, {
-                        text: '❌ Failed to generate checkout link. Please try again in a moment.'
-                    });
-                }
                 return;
             }
 
@@ -574,18 +547,20 @@ async function startWhatsAppWorker() {
                 return;
             }
 
-            // 6. Check Credit Balance
-            if (user.credit_balance <= 0) {
-                await sock.sendMessage(remoteJid, {
-                    text:
-                        `⚠️ *Out of Credits, ${(user.name || 'there').split(' ')[0]}*\n\n` +
-                        `You have 0 credits remaining. Please reply *BUY* to replenish your balance.`
-                });
-                return;
-            }
-
-            // 7. Handle DIAGNOSTIC LAB / SCAN IMAGE UPLOAD
+            // 6. Handle DIAGNOSTIC LAB / SCAN IMAGE UPLOAD
             if (isImage) {
+                if (user.credit_balance <= 0) {
+                    const cleanPhone = remoteJid.replace(/[^0-9]/g, '');
+                    const topupUrl = `https://getafyalinks.com/tuna-ai?phone=${cleanPhone}#pricing`;
+                    await sock.sendMessage(remoteJid, {
+                        text:
+                            `⚠️ *Out of Case Credits, ${(user.name || 'there').split(' ')[0]}*\n\n` +
+                            `Diagnostic lab interpretation requires 1 Case Credit.\n\n` +
+                            `👉 *Top up online here:*\n${topupUrl}`
+                    });
+                    return;
+                }
+
                 await sock.sendMessage(remoteJid, { text: '🔬 *Analyzing laboratory/scan report using Vision AI...*' });
                 await sock.sendPresenceUpdate('composing', remoteJid);
 

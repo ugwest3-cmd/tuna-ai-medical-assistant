@@ -116,17 +116,45 @@ async def handle_clinical_query(
     Output is strictly formatted per Uganda Clinical Guidelines with zero page citations.
     Supports personalized responses via user_name and role-differentiated prompting via user_role.
     """
-    # 1. Atomic credit deduction check
-    deducted = rag_engine.supabase.rpc("deduct_credit", {
-        "p_user_id": payload.user_id,
-        "p_amount": 1
-    }).execute()
+    # 1. Check if this is an ongoing case continuation (1 Credit = 1 Entire Patient Case)
+    # Subsequent questions, vitals updates, and follow-ups within the same case are FREE.
+    is_continuation = False
+    if payload.case_id:
+        try:
+            existing_msgs = rag_engine.supabase.table("case_messages")\
+                .select("id")\
+                .eq("case_id", payload.case_id)\
+                .limit(1)\
+                .execute()
+            if existing_msgs.data and len(existing_msgs.data) > 0:
+                is_continuation = True
+        except Exception as check_err:
+            print(f"[Credit Check] Warning checking case continuation: {check_err}")
 
-    if not deducted.data:
-        return {
-            "status": "insufficient_credits",
-            "message": "⚠️ *Insufficient Balance:* You have 0 credits remaining.\n\nReply *BUY* to view top-up packages."
-        }
+    # Only deduct 1 credit if starting a brand NEW case
+    if not is_continuation:
+        deducted = rag_engine.supabase.rpc("deduct_credit", {
+            "p_user_id": payload.user_id,
+            "p_amount": 1
+        }).execute()
+
+        if not deducted.data:
+            clean_phone = payload.phone.replace("@s.whatsapp.net", "").replace("+", "").strip()
+            topup_url = f"https://getafyalinks.com/tuna-ai?phone={clean_phone}#pricing"
+            return {
+                "status": "insufficient_credits",
+                "message": (
+                    "⚠️ *Out of Case Credits*\n\n"
+                    "You have 0 Case Credits remaining. Each credit covers 1 complete patient case with unlimited follow-ups.\n\n"
+                    f"👉 *Top up cases online:*\n{topup_url}\n\n"
+                    "• 10 Cases — 2,000 UGX\n"
+                    "• 50 Cases — 5,000 UGX\n"
+                    "• 100 Cases — 10,000 UGX\n"
+                    "• 300 Cases — 25,000 UGX\n"
+                    "• 1,000 Cases — 70,000 UGX\n\n"
+                    "_Pay easily with MTN MoMo, Airtel Money & Cards._"
+                )
+            }
 
     # 2. Execute RAG pipeline with user context
     try:
@@ -144,11 +172,12 @@ async def handle_clinical_query(
         }
     except Exception as e:
         print(f"[Query Error] {e}")
-        # Refund credit if processing failed
-        rag_engine.supabase.rpc("increment_user_credits", {
-            "user_uuid": payload.user_id,
-            "amount_to_add": 1
-        }).execute()
+        # Refund credit only if this was a newly billed case
+        if not is_continuation:
+            rag_engine.supabase.rpc("increment_user_credits", {
+                "user_uuid": payload.user_id,
+                "amount_to_add": 1
+            }).execute()
         raise HTTPException(status_code=500, detail="Clinical inference service failed. Credit refunded.")
 
 # -------------------------------------------------------------

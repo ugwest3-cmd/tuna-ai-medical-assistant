@@ -10,9 +10,15 @@ from supabase import create_client, Client
 from config import settings
 
 TIER_PRICING = {
-    "1": {"credits": 100, "amount": 10000.0, "desc": "100 Clinical Credits (10,000 UGX)"},
-    "2": {"credits": 300, "amount": 25000.0, "desc": "300 Clinical Credits (25,000 UGX)"},
-    "3": {"credits": 1000, "amount": 70000.0, "desc": "1,000 Clinical Credits (70,000 UGX)"}
+    "10": {"credits": 10, "amount": 2000.0, "desc": "10 Patient Cases (2,000 UGX)"},
+    "50": {"credits": 50, "amount": 5000.0, "desc": "50 Patient Cases (5,000 UGX)"},
+    "100": {"credits": 100, "amount": 10000.0, "desc": "100 Patient Cases (10,000 UGX)"},
+    "300": {"credits": 300, "amount": 25000.0, "desc": "300 Patient Cases (25,000 UGX)"},
+    "1000": {"credits": 1000, "amount": 70000.0, "desc": "1,000 Patient Cases (70,000 UGX)"},
+    # Backwards compatibility
+    "1": {"credits": 100, "amount": 10000.0, "desc": "100 Patient Cases (10,000 UGX)"},
+    "2": {"credits": 300, "amount": 25000.0, "desc": "300 Patient Cases (25,000 UGX)"},
+    "3": {"credits": 1000, "amount": 70000.0, "desc": "1,000 Patient Cases (70,000 UGX)"}
 }
 
 class PesaPalService:

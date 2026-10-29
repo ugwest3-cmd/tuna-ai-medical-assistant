@@ -128,23 +128,43 @@ module.exports = async (req, res) => {
         return res.status(405).json({ error: 'Method Not Allowed' });
     }
 
-    const { user_id, prompt } = req.body || {};
+    const { user_id, prompt, case_id, phone } = req.body || {};
     if (!prompt) {
         return res.status(400).json({ error: 'Missing prompt' });
     }
 
     try {
-        // 1. Atomic credit deduction if user_id is provided
-        if (user_id) {
+        // 1. Check if this is an ongoing case continuation (0 credits deducted)
+        // 1 Credit = 1 Entire Patient Case with unlimited follow-up queries.
+        let isContinuation = false;
+        if (case_id) {
+            try {
+                const { data: existingMsgs } = await supabase
+                    .from('case_messages')
+                    .select('id')
+                    .eq('case_id', case_id)
+                    .limit(1);
+                if (existingMsgs && existingMsgs.length > 0) {
+                    isContinuation = true;
+                }
+            } catch (checkErr) {
+                console.warn('[Web Credit Check] Warning checking case continuation:', checkErr.message);
+            }
+        }
+
+        // Only deduct 1 credit if user_id is provided and starting a brand NEW case
+        if (user_id && !isContinuation) {
             const { data: deducted } = await supabase.rpc('deduct_credit', {
                 p_user_id: user_id,
                 p_amount: 1
             });
 
             if (!deducted) {
+                const cleanPhone = (phone || '').replace(/[^0-9]/g, '');
+                const topupUrl = `https://getafyalinks.com/tuna-ai?phone=${cleanPhone}#pricing`;
                 return res.status(200).json({
                     status: 'insufficient_credits',
-                    message: '⚠️ *Insufficient Balance:* You have 0 credits remaining.\n\nReply *BUY* to view top-up packages.'
+                    message: `⚠️ *Out of Case Credits*\n\nYou have 0 Case Credits remaining. Each credit covers 1 complete patient case.\n\n👉 *Top up cases online:*\n${topupUrl}\n\n• 10 Cases — 2,000 UGX\n• 50 Cases — 5,000 UGX\n• 100 Cases — 10,000 UGX\n• 300 Cases — 25,000 UGX\n• 1,000 Cases — 70,000 UGX\n\n_Pay easily with MTN MoMo, Airtel Money & Cards._`
                 });
             }
         }
