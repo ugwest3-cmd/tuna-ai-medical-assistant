@@ -112,6 +112,33 @@ class RAGEngine:
             print(f"[RAG Engine] Vector retrieval error: {e}")
             return []
 
+    def retrieve_case_history(
+        self,
+        case_id: str,
+        limit: int = 10
+    ) -> List[Dict[str, str]]:
+        """
+        Fetches the recent conversation messages for a given case_id from case_messages.
+        Returns a list of {"role": "user"|"assistant", "content": "..."} dicts suitable
+        for inclusion in Groq's messages array.
+        """
+        try:
+            result = self.supabase.table("case_messages") \
+                .select("direction, content, created_at") \
+                .eq("case_id", case_id) \
+                .order("created_at", desc=False) \
+                .limit(limit) \
+                .execute()
+
+            history = []
+            for row in (result.data or []):
+                role = "user" if row["direction"] == "inbound" else "assistant"
+                history.append({"role": role, "content": row["content"]})
+            return history
+        except Exception as e:
+            print(f"[RAG Engine] Case history retrieval error: {e}")
+            return []
+
     async def generate_response(
         self,
         user_id: str,
@@ -123,6 +150,7 @@ class RAGEngine:
         """
         Orchestrates retrieval, emergency triage checks, Groq generation, and chat logging.
         Supports personalized prompting based on user_name and user_role.
+        Passes conversation history from case_messages so the AI has full session memory.
         Logs inbound/outbound messages to case_messages table when case_id is provided.
         """
         # 1. Check for life-threatening emergency signs
@@ -135,8 +163,9 @@ class RAGEngine:
             formatted_context = "\n\n---\n\n".join(context_chunks)
         else:
             formatted_context = (
-                "Provide authoritative guidance strictly adhering to the standard "
-                "Uganda Clinical Guidelines (UCG) and Ministry of Health Uganda protocols."
+                "[NO SPECIFIC UCG EXTRACT FOUND FOR THIS QUERY. Adhere to standard UCG fundamentals. "
+                "If the topic is outside national primary care guidelines, state clearly that UCG lacks "
+                "a standardized protocol for this condition rather than speculating.]"
             )
 
         # 3. Select system prompt based on user role
@@ -151,20 +180,38 @@ class RAGEngine:
             role_label = "Medical Student" if user_role == "student" else user_role.capitalize()
             personalization = f"You are speaking with {user_name}, a {role_label}.\n\n"
 
-        # 5. Construct prompt for Groq
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {
-                "role": "user",
-                "content": (
-                    f"{personalization}"
-                    f"CLINICAL GUIDELINE KNOWLEDGE:\n{formatted_context}\n\n"
-                    f"HEALTH WORKER CLINICAL QUERY:\n{prompt}\n\n"
-                    f"REMINDER: Provide a short, clean, structured treatment protocol with exact dosages "
-                    f"according to Uganda Clinical Guidelines. Do NOT include page numbers or book citations."
-                )
-            }
+        # 5. Build message array — start with system, inject context, then conversation history
+        system_content = (
+            f"{system_prompt}\n\n"
+            f"═══════════════════════════\n"
+            f"CLINICAL GUIDELINE KNOWLEDGE (UCG):\n{formatted_context}\n"
+            f"═══════════════════════════\n"
+            f"{personalization}"
+        )
+
+        messages: List[Dict[str, str]] = [
+            {"role": "system", "content": system_content}
         ]
+
+        # 5a. Inject conversation history (previous turns of this case) for multi-turn memory
+        if case_id:
+            history = self.retrieve_case_history(case_id, limit=10)
+            messages.extend(history)
+
+        # 5b. Append the current user message
+        messages.append({
+            "role": "user",
+            "content": (
+                f"{prompt}\n\n"
+                f"[CLINICAL DECISION RULES:\n"
+                f"1. Vitals First: Request appropriate vitals (Temp, BP, Pulse, RR, Wt) before advising.\n"
+                f"2. Single Question: Ask ONLY ONE high-yield question at a time.\n"
+                f"3. Ranked Differentials: List numbered differentials with a 1-line reason each.\n"
+                f"4. Treatment Locked: Do NOT provide drug names or dosages unless explicit confirmation triggers (e.g. RDT+, lab confirmed, diagnosed with) are present.\n"
+                f"5. Anti-Hallucination: If UCG does not cover this query, state the UCG Scope Notice honestly.\n"
+                f"6. No page numbers or book citations.]"
+            )
+        })
 
         # 6. Log the inbound message to case_messages if a case_id is provided
         if case_id:

@@ -58,6 +58,12 @@ let sock = null;
 let latestQR = null;          // stores the current QR code string
 let waStatus = 'disconnected'; // 'disconnected' | 'qr_ready' | 'online'
 
+// -----------------------------------------------------------------------
+// In-memory store for users who are being asked "new case or continuation?"
+// Format: { [remoteJid]: { pendingText: string, existingCaseId: string, existingCaseRef: string, askedAt: number } }
+// -----------------------------------------------------------------------
+const pendingNewCaseConfirm = {};
+
 
 // Wipe all session files so a clean pairing code can be generated on next start
 function clearSession() {
@@ -131,8 +137,10 @@ async function sendChunked(jid, text, socket) {
 // -----------------------------------------------------------------------
 // UTILITY: getOrCreateActiveCase
 // Checks if the user has an open case updated within the last 2 hours.
-// If so, reuses it. Otherwise creates a fresh case with a generated ref.
-// Returns { case_id, case_ref }
+// If the user's message looks like a NEW patient case (not a follow-up),
+// it returns { case_id, case_ref, isNew: true, previousCaseRef } so the
+// caller can ask the user to confirm whether this is a new case.
+// Returns { case_id, case_ref, isNew, previousCaseRef }
 // -----------------------------------------------------------------------
 async function getOrCreateActiveCase(userId, messageText) {
     const TWO_HOURS_AGO = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
@@ -154,16 +162,21 @@ async function getOrCreateActiveCase(userId, messageText) {
             .from('cases')
             .update({ last_updated_at: new Date().toISOString() })
             .eq('id', activeCase.id);
-        return { case_id: activeCase.id, case_ref: activeCase.case_ref };
+        return { case_id: activeCase.id, case_ref: activeCase.case_ref, isExisting: true };
     }
 
     // No recent active case — create a new one
-    // Generate case_ref locally: TUN-YYYY-XXXXX (last 5 digits of timestamp for uniqueness)
+    return await createNewCase(userId, messageText);
+}
+
+// -----------------------------------------------------------------------
+// UTILITY: createNewCase
+// Creates a brand new case record and returns its id and ref.
+// -----------------------------------------------------------------------
+async function createNewCase(userId, messageText) {
     const year = new Date().getFullYear();
     const uniqueSuffix = String(Date.now()).slice(-5);
     const caseRef = `TUN-${year}-${uniqueSuffix}`;
-
-    // Use the first 80 chars of the message as the case title
     const caseTitle = (messageText || '').substring(0, 80).trim() || null;
 
     const { data: newCase, error: caseErr } = await supabase
@@ -179,10 +192,10 @@ async function getOrCreateActiveCase(userId, messageText) {
 
     if (caseErr) {
         console.error('[Worker] Failed to create case:', caseErr.message);
-        return { case_id: null, case_ref: null };
+        return { case_id: null, case_ref: null, isExisting: false };
     }
 
-    return { case_id: newCase.id, case_ref: newCase.case_ref };
+    return { case_id: newCase.id, case_ref: newCase.case_ref, isExisting: false };
 }
 
 // -----------------------------------------------------------------------
@@ -624,55 +637,143 @@ async function startWhatsAppWorker() {
 
             await sock.sendPresenceUpdate('composing', remoteJid);
 
-            // Get or create an active case for this session
+            // ----------------------------------------------------------------
+            // NEW-CASE DETECTION: Check if user is responding to "new case?" prompt
+            // ----------------------------------------------------------------
+            if (pendingNewCaseConfirm[remoteJid]) {
+                const pending = pendingNewCaseConfirm[remoteJid];
+                delete pendingNewCaseConfirm[remoteJid];
+
+                const reply = cleanText.trim().toLowerCase();
+
+                let activeCaseId, activeCaseRef;
+
+                if (reply === 'new' || reply === '1' || reply.includes('new case')) {
+                    // Close the old case and open a fresh one
+                    await supabase
+                        .from('cases')
+                        .update({ status: 'closed' })
+                        .eq('id', pending.existingCaseId);
+
+                    const freshCase = await createNewCase(user.id, pending.pendingText);
+                    activeCaseId = freshCase.case_id;
+                    activeCaseRef = freshCase.case_ref;
+
+                    await sock.sendMessage(remoteJid, {
+                        text: `✅ *New Case Started: ${activeCaseRef}*\n\nProcessing your query now...`
+                    });
+                } else {
+                    // Continue with existing case
+                    activeCaseId = pending.existingCaseId;
+                    activeCaseRef = pending.existingCaseRef;
+
+                    // Refresh the case timestamp
+                    await supabase
+                        .from('cases')
+                        .update({ last_updated_at: new Date().toISOString() })
+                        .eq('id', activeCaseId);
+
+                    await sock.sendMessage(remoteJid, {
+                        text: `📁 *Continuing Case ${activeCaseRef}*\n\nProcessing your update...`
+                    });
+                }
+
+                // Now send the pending text to the AI
+                await dispatchClinicalQuery(remoteJid, user, pending.pendingText, activeCaseId, activeCaseRef);
+                return;
+            }
+
+            // ----------------------------------------------------------------
+            // STANDARD FLOW: Get or create active case
+            // ----------------------------------------------------------------
             let activeCaseId = null;
             let activeCaseRef = null;
             try {
                 const caseData = await getOrCreateActiveCase(user.id, cleanText);
                 activeCaseId = caseData.case_id;
                 activeCaseRef = caseData.case_ref;
+
+                // If this is an EXISTING case, check if the user might be starting a new case.
+                // Heuristic: the message is longer than 20 chars AND does NOT start with common
+                // follow-up phrases (yes, no, ok, confirmed, results, test, it shows, etc.)
+                if (caseData.isExisting && activeCaseId) {
+                    const followUpPhrases = /^(yes|no|ok|okay|confirmed|the (results|test|scan|rdt)|it shows|it is|found|got|done|patient|and|also|he|she|they|i|bp|pulse|temp|spo2|\d)/i;
+                    const looksLikeNewCase = cleanText.length > 25 && !followUpPhrases.test(cleanText.trim());
+
+                    if (looksLikeNewCase) {
+                        // Ask user before proceeding
+                        pendingNewCaseConfirm[remoteJid] = {
+                            pendingText: cleanText,
+                            existingCaseId: activeCaseId,
+                            existingCaseRef: activeCaseRef,
+                            askedAt: Date.now()
+                        };
+
+                        await sock.sendMessage(remoteJid, {
+                            text:
+                                `📋 *Case Check*\n\n` +
+                                `You have an active case open: *${activeCaseRef}*\n\n` +
+                                `Is this a continuation of the same case, or a *new patient case*?\n\n` +
+                                `Reply:\n` +
+                                `*1* — 🆕 New case (closes current)\n` +
+                                `*2* — 🔄 Same case (continue)`
+                        });
+                        return;
+                    }
+                }
+
             } catch (caseErr) {
                 console.error('[Worker] Case management error (non-fatal):', caseErr.message);
                 // Continue without case tracking if it fails
             }
 
-            try {
-                const apiRes = await axios.post(
-                    `${CORE_API_URL}/api/v1/query`,
-                    {
-                        user_id: user.id,
-                        phone: remoteJid,
-                        prompt: cleanText,
-                        user_name: user.name || '',
-                        user_role: user.role || 'professional',
-                        case_id: activeCaseId
-                    },
-                    {
-                        headers: { 'x-secret': INTERNAL_SECRET },
-                        timeout: 60000
-                    }
-                );
-
-                if (apiRes.data.status === 'insufficient_credits') {
-                    await sock.sendMessage(remoteJid, { text: apiRes.data.message });
-                } else if (apiRes.data.response) {
-                    // Send chunked response; prepend case reference for context
-                    const responseText = activeCaseRef
-                        ? `📁 *Case ${activeCaseRef}*\n\n${apiRes.data.response}`
-                        : apiRes.data.response;
-                    await sendChunked(remoteJid, responseText, sock);
-                }
-            } catch (queryErr) {
-                console.error('[Worker] Core API Query error:', queryErr.message);
-                await sock.sendMessage(remoteJid, {
-                    text: '⚠️ *System Notice:* A temporary delay occurred while processing your clinical query. Please re-send.'
-                });
-            }
+            await dispatchClinicalQuery(remoteJid, user, cleanText, activeCaseId, activeCaseRef);
 
         } catch (msgErr) {
             console.error('[Worker] General message handling error:', msgErr);
         }
     });
+}
+
+// -----------------------------------------------------------------------
+// UTILITY: dispatchClinicalQuery
+// Sends a clinical query to Core API and delivers the chunked response.
+// Extracted so it can be called from both the normal flow and the
+// new-case-confirm resolution flow.
+// -----------------------------------------------------------------------
+async function dispatchClinicalQuery(remoteJid, user, queryText, activeCaseId, activeCaseRef) {
+    try {
+        const apiRes = await axios.post(
+            `${CORE_API_URL}/api/v1/query`,
+            {
+                user_id: user.id,
+                phone: remoteJid,
+                prompt: queryText,
+                user_name: user.name || '',
+                user_role: user.role || 'professional',
+                case_id: activeCaseId
+            },
+            {
+                headers: { 'x-secret': INTERNAL_SECRET },
+                timeout: 60000
+            }
+        );
+
+        if (apiRes.data.status === 'insufficient_credits') {
+            await sock.sendMessage(remoteJid, { text: apiRes.data.message });
+        } else if (apiRes.data.response) {
+            // Send chunked response; prepend case reference for context
+            const responseText = activeCaseRef
+                ? `📁 *Case ${activeCaseRef}*\n\n${apiRes.data.response}`
+                : apiRes.data.response;
+            await sendChunked(remoteJid, responseText, sock);
+        }
+    } catch (queryErr) {
+        console.error('[Worker] Core API Query error:', queryErr.message);
+        await sock.sendMessage(remoteJid, {
+            text: '⚠️ *System Notice:* A temporary delay occurred while processing your clinical query. Please re-send.'
+        });
+    }
 }
 
 // -------------------------------------------------------------
