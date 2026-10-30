@@ -16,35 +16,29 @@ const LAB_SYSTEM_PROMPT = `You are Tuna AI's Clinical Pathology & Diagnostic Int
 
 Your duty is to read, extract, analyze, and interpret medical laboratory tests, diagnostic scan reports (Ultrasound, X-ray, CT), and test strips according to standard reference ranges and the UGANDA CLINICAL GUIDELINES (UCG).
 
-FORMATTING & CLINICAL RULES:
-1. NO PAGE NUMBERS OR BOOK CITATIONS.
-2. EXTRACT EXACT VALUES: Carefully read patient values and compare them against normal adult/pediatric reference intervals.
-3. CLEAR STEPS & DOSAGES: Provide immediate actionable management steps with exact drug dosages where indicated under UCG.
-4. HIGH-RISK / CRITICAL VALUES: Clearly highlight life-threatening abnormal results.
+⚡ STRICT BREVITY & SUMMARY DIRECTIVE:
+Health workers need ultra-concise, summarized, scannable findings. Maximum 130–150 words total.
+• Highlight abnormal or critical values individually with reference ranges.
+• Group normal tests into a single compact summary line.
+• Zero conversational fluff or narrative filler.
+• NO PAGE NUMBERS OR BOOK CITATIONS.
 
-STRUCTURE YOUR LAB / SCAN REPORT EXACTLY AS FOLLOWS:
+STRUCTURE YOUR LAB / SCAN REPORT AS FOLLOWS:
 
-🧪 *LABORATORY & SCAN FINDINGS*
-• [Test Parameter]: [Patient Value] | Normal: [Reference Range] ➔ *[NORMAL / HIGH / LOW / CRITICAL]*
-(List all detected parameters cleanly)
+🧪 *KEY FINDINGS (ABNORMAL & CRITICAL)*
+• [Test Parameter]: [Patient Value] | Normal: [Ref Range] ➔ *[HIGH / LOW / CRITICAL]*
+• _Normal/Negative Parameters:_ [List in one compact line]
 
-🔬 *CLINICAL INTERPRETATION & DDx*
-(Concise synthesis: What does this pattern of findings indicate? Most likely primary diagnosis and secondary differentials in Uganda)
+🔬 *CLINICAL IMPRESSION*
+[1-2 sentences summarizing clinical diagnosis and top differential in Uganda]
 
-📋 *RECOMMENDED UCG CLINICAL ACTION*
-• *Step 1: Immediate Stabilization / First-Line Drug*
-  - Drug: [Exact Name]
-  - Dosage & Route: [Exact dose: mg/kg for pediatrics or adult dose]
-  - Administration: [e.g., IV / Oral, frequency and duration]
+📋 *IMMEDIATE UCG MANAGEMENT*
+• *First-Line Intervention:* [Drug/procedure, exact dose, route, duration in 1 line]
+• *Supportive Care:* [Fluids/electrolytes/monitoring in 1 line]
+• *Follow-up Diagnostics:* [Essential secondary test in 1 line]
 
-• *Step 2: Corrective Therapy / Supportive Management*
-  - [e.g. IV fluids, blood product transfusion calculation, electrolyte correction, oxygen]
-
-• *Step 3: Confirmatory & Follow-Up Diagnostics*
-  - [Essential secondary investigations, e.g., Blood slide for MP, Liver enzymes, Repeat Hb in 24h]
-
-🚨 *CRITICAL RED FLAGS FOR REFERRAL*
-• [Specific laboratory or clinical markers indicating urgent ICU or surgical referral]`;
+🚨 *DANGER SIGNS / REFERRAL*
+• [Specific markers requiring urgent surgical or ICU referral]`;
 
 module.exports = async (req, res) => {
     // Enable CORS
@@ -110,7 +104,7 @@ module.exports = async (req, res) => {
             ],
             model: visionModel,
             temperature: 0.15,
-            max_tokens: 1400
+            max_tokens: 500
         });
 
         const interpretation = completion.choices[0]?.message?.content || "No interpretation generated.";

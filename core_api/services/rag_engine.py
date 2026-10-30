@@ -9,50 +9,7 @@ from supabase import create_client, Client
 from sentence_transformers import SentenceTransformer
 
 from config import settings
-from services.safety import UCG_SYSTEM_PROMPT, screen_emergency_red_flags
-
-# -------------------------------------------------------------------------
-# Student-oriented system prompt — explains concepts, provides learning
-# context, and uses simplified medical language suitable for medical students.
-# -------------------------------------------------------------------------
-STUDENT_SYSTEM_PROMPT = """You are Tuna AI, a friendly and educational medical tutor built for medical students in Uganda.
-
-Your role is to TEACH, not just prescribe. Always explain the 'why' behind clinical decisions using Uganda Clinical Guidelines (UCG) and Ministry of Health Uganda protocols as your foundation.
-
-TEACHING PRINCIPLES:
-1. EXPLAIN PATHOPHYSIOLOGY briefly — help the student understand what is happening in the body.
-2. USE SIMPLIFIED LANGUAGE — avoid unexplained jargon; define terms when you use them.
-3. CONNECT TO GUIDELINES — reference UCG protocols so students learn the standard of care.
-4. ENCOURAGE CRITICAL THINKING — pose a key learning question at the end where appropriate.
-5. NO PAGE NUMBERS — do not cite page numbers or document editions.
-
-STRUCTURE EVERY EDUCATIONAL ANSWER AS FOLLOWS:
-
-📚 *WHAT IS HAPPENING?*
-(Brief pathophysiology or clinical background in plain language)
-
-🩺 *CLINICAL ASSESSMENT*
-(Key signs, symptoms, and how to diagnose this condition)
-
-📋 *TREATMENT PROTOCOL (UCG)*
-• *Step 1: First-Line Management*
-  - Drug: [Exact Name]
-  - Dosage: [Exact dose with mg/kg for paediatrics, adult dose]
-  - Route & Frequency: [e.g., IV slowly, every 8 hours]
-  - Why this drug? [Brief pharmacological reasoning]
-
-• *Step 2: Supportive Care*
-  - [Hydration, monitoring, nutritional support]
-
-• *Step 3: When to Refer*
-  - [Clear escalation criteria]
-
-🚨 *RED FLAGS TO WATCH*
-• [Critical warning signs requiring urgent action]
-
-💡 *LEARNING POINT*
-(One key takeaway or question to deepen understanding)
-"""
+from services.safety import UCG_SYSTEM_PROMPT, STUDENT_SYSTEM_PROMPT, screen_emergency_red_flags
 
 
 class RAGEngine:
@@ -203,13 +160,14 @@ class RAGEngine:
             "role": "user",
             "content": (
                 f"{prompt}\n\n"
-                f"[CLINICAL DECISION RULES:\n"
-                f"1. Vitals First: Request appropriate vitals (Temp, BP, Pulse, RR, Wt) before advising.\n"
-                f"2. Single Question: Ask ONLY ONE high-yield question at a time.\n"
-                f"3. Ranked Differentials: List numbered differentials with a 1-line reason each.\n"
-                f"4. Treatment Locked: Do NOT provide drug names or dosages unless explicit confirmation triggers (e.g. RDT+, lab confirmed, diagnosed with) are present.\n"
-                f"5. Anti-Hallucination: If UCG does not cover this query, state the UCG Scope Notice honestly.\n"
-                f"6. No page numbers or book citations.]"
+                f"[STRICT BREVITY & SUMMARY DIRECTIVE:\n"
+                f"Ugandan health workers need ultra-concise, summarized, scannable bedside guidance.\n"
+                f"• Maximum 120-150 words total. Zero conversational fluff.\n"
+                f"• Vitals First: Request critical vitals (Temp, BP, Pulse, RR, Wt) before prescribing.\n"
+                f"• Single Question: Ask ONLY ONE high-yield question.\n"
+                f"• Ranked Differentials: 1-line reason each (max 6 words per line).\n"
+                f"• Treatment Locked: No drug doses unless diagnosis is confirmed.\n"
+                f"• Zero page numbers or citations.]"
             )
         })
 
@@ -234,7 +192,7 @@ class RAGEngine:
             "model": settings.GROQ_TEXT_MODEL,
             "messages": messages,
             "temperature": 0.2,
-            "max_tokens": 1200
+            "max_tokens": 450
         }
 
         async with httpx.AsyncClient(timeout=45.0) as client:
