@@ -192,7 +192,7 @@ class RAGEngine:
             "model": settings.GROQ_TEXT_MODEL,
             "messages": messages,
             "temperature": 0.2,
-            "max_tokens": 450
+            "max_tokens": 1200
         }
 
         async with httpx.AsyncClient(timeout=45.0) as client:
@@ -204,7 +204,18 @@ class RAGEngine:
             if resp.status_code != 200:
                 raise RuntimeError(f"Groq API request failed [{resp.status_code}]: {resp.text}")
             result_json = resp.json()
-            raw_ai_text = result_json["choices"][0]["message"]["content"]
+            choice = result_json.get("choices", [{}])[0]
+            message = choice.get("message", {})
+            raw_ai_text = (
+                message.get("content") 
+                or message.get("reasoning_content") 
+                or message.get("refusal") 
+                or ""
+            ).strip()
+
+            if not raw_ai_text:
+                print(f"[RAG Engine Warning] Empty Groq completion: {result_json}")
+                raise RuntimeError("Groq completion returned empty content.")
 
         # 8. Prepend emergency alert if triggered
         final_response = f"{emergency_alert}{raw_ai_text}" if emergency_alert else raw_ai_text

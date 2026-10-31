@@ -180,10 +180,21 @@ module.exports = async (req, res) => {
             ],
             model: process.env.GROQ_TEXT_MODEL || 'llama-3.3-70b-versatile',
             temperature: 0.2,
-            max_tokens: 450
+            max_tokens: 1200
         });
 
-        const aiResponse = chatCompletion.choices[0]?.message?.content || 'No response generated.';
+        const choice = chatCompletion.choices?.[0];
+        const aiResponse = (
+            choice?.message?.content 
+            || choice?.message?.reasoning_content 
+            || choice?.message?.refusal 
+            || ''
+        ).trim();
+
+        if (!aiResponse) {
+            console.error('[Vercel Query Error] Empty Groq completion:', JSON.stringify(chatCompletion));
+            return res.status(500).json({ error: 'AI generation returned empty response. Please re-send.' });
+        }
 
         // 3. Log to Supabase audit trail if user_id exists
         if (user_id) {

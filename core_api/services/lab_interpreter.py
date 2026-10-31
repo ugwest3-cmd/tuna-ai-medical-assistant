@@ -77,7 +77,7 @@ class LabInterpreter:
             "model": self.vision_model,
             "messages": messages,
             "temperature": 0.15,
-            "max_tokens": 500
+            "max_tokens": 1200
         }
 
         async with httpx.AsyncClient(timeout=60.0) as client:
@@ -89,7 +89,9 @@ class LabInterpreter:
             if resp.status_code != 200:
                 raise RuntimeError(f"Groq Vision API failed [{resp.status_code}]: {resp.text}")
             result_json = resp.json()
-            return result_json["choices"][0]["message"]["content"]
+            choice = result_json.get("choices", [{}])[0]
+            message = choice.get("message", {})
+            return (message.get("content") or message.get("reasoning_content") or message.get("refusal") or "").strip()
 
     async def interpret_from_text(self, lab_text: str) -> str:
         """
@@ -111,7 +113,7 @@ class LabInterpreter:
             "model": self.text_model,
             "messages": messages,
             "temperature": 0.15,
-            "max_tokens": 500
+            "max_tokens": 1200
         }
 
         async with httpx.AsyncClient(timeout=45.0) as client:
@@ -123,4 +125,6 @@ class LabInterpreter:
             if resp.status_code != 200:
                 raise RuntimeError(f"Groq Text API failed [{resp.status_code}]: {resp.text}")
             result_json = resp.json()
-            return result_json["choices"][0]["message"]["content"]
+            choice = result_json.get("choices", [{}])[0]
+            message = choice.get("message", {})
+            return (message.get("content") or message.get("reasoning_content") or message.get("refusal") or "").strip()

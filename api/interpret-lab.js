@@ -104,10 +104,21 @@ module.exports = async (req, res) => {
             ],
             model: visionModel,
             temperature: 0.15,
-            max_tokens: 500
+            max_tokens: 1200
         });
 
-        const interpretation = completion.choices[0]?.message?.content || "No interpretation generated.";
+        const choice = completion.choices?.[0];
+        const interpretation = (
+            choice?.message?.content 
+            || choice?.message?.reasoning_content 
+            || choice?.message?.refusal 
+            || ''
+        ).trim();
+
+        if (!interpretation) {
+            console.error('[Vercel Lab Error] Empty Groq vision completion:', JSON.stringify(completion));
+            return res.status(500).json({ error: 'Could not analyze lab report. Please ensure the image is clear and try again.' });
+        }
 
         if (user_id) {
             await supabase.from('chat_logs').insert({
