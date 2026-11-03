@@ -160,14 +160,11 @@ class RAGEngine:
             "role": "user",
             "content": (
                 f"{prompt}\n\n"
-                f"[STRICT BREVITY & SUMMARY DIRECTIVE:\n"
-                f"Ugandan health workers need ultra-concise, summarized, scannable bedside guidance.\n"
-                f"• Maximum 120-150 words total. Zero conversational fluff.\n"
-                f"• Vitals First: Request critical vitals (Temp, BP, Pulse, RR, Wt) before prescribing.\n"
-                f"• Single Question: Ask ONLY ONE high-yield question.\n"
-                f"• Ranked Differentials: 1-line reason each (max 6 words per line).\n"
-                f"• Treatment Locked: No drug doses unless diagnosis is confirmed.\n"
-                f"• Zero page numbers or citations.]"
+                f"[BREVITY RULE: You are on WhatsApp. "
+                f"If this is a FOLLOW-UP (vitals, test results, answers to your questions), "
+                f"reply in 1-3 short lines — NO section headers — then ask ONE next question. Max 50 words.\n"
+                f"If this is a NEW presentation, use the structured format. Max 100 words.\n"
+                f"Zero page numbers. Zero fluff.]"
             )
         })
 

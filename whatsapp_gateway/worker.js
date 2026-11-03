@@ -64,6 +64,12 @@ let waStatus = 'disconnected'; // 'disconnected' | 'qr_ready' | 'online'
 // -----------------------------------------------------------------------
 const pendingNewCaseConfirm = {};
 
+// -----------------------------------------------------------------------
+// Cooldown tracker: after a user confirms "same case", don't re-ask for 5 min
+// Format: { [remoteJid]: timestamp }
+// -----------------------------------------------------------------------
+const caseCheckCooldown = {};
+
 
 // Wipe all session files so a clean pairing code can be generated on next start
 function clearSession() {
@@ -634,8 +640,11 @@ async function startWhatsAppWorker() {
                     activeCaseId = freshCase.case_id;
                     activeCaseRef = freshCase.case_ref;
 
+                    // Set cooldown so we don't re-ask immediately
+                    caseCheckCooldown[remoteJid] = Date.now();
+
                     await sock.sendMessage(remoteJid, {
-                        text: `✅ *New Case Started: ${activeCaseRef}*\n\nProcessing your query now...`
+                        text: `🆕 New case *${activeCaseRef}* opened. Processing...`
                     });
                 } else {
                     // Continue with existing case
@@ -648,8 +657,11 @@ async function startWhatsAppWorker() {
                         .update({ last_updated_at: new Date().toISOString() })
                         .eq('id', activeCaseId);
 
+                    // Set cooldown so we don't re-ask for the next 5 minutes
+                    caseCheckCooldown[remoteJid] = Date.now();
+
                     await sock.sendMessage(remoteJid, {
-                        text: `📁 *Continuing Case ${activeCaseRef}*\n\nProcessing your update...`
+                        text: `👍 Continuing *${activeCaseRef}*...`
                     });
                 }
 
@@ -669,31 +681,40 @@ async function startWhatsAppWorker() {
                 activeCaseRef = caseData.case_ref;
 
                 // If this is an EXISTING case, check if the user might be starting a new case.
-                // Heuristic: the message is longer than 20 chars AND does NOT start with common
-                // follow-up phrases (yes, no, ok, confirmed, results, test, it shows, etc.)
+                // Guard: skip this check if we recently asked and the user confirmed "same case"
                 if (caseData.isExisting && activeCaseId) {
-                    const followUpPhrases = /^(yes|no|ok|okay|confirmed|the (results|test|scan|rdt)|it shows|it is|found|got|done|patient|and|also|he|she|they|i|bp|pulse|temp|spo2|\d)/i;
-                    const looksLikeNewCase = cleanText.length > 25 && !followUpPhrases.test(cleanText.trim());
+                    const COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes
+                    const lastCheck = caseCheckCooldown[remoteJid] || 0;
+                    const withinCooldown = (Date.now() - lastCheck) < COOLDOWN_MS;
 
-                    if (looksLikeNewCase) {
-                        // Ask user before proceeding
-                        pendingNewCaseConfirm[remoteJid] = {
-                            pendingText: cleanText,
-                            existingCaseId: activeCaseId,
-                            existingCaseRef: activeCaseRef,
-                            askedAt: Date.now()
-                        };
+                    if (!withinCooldown) {
+                        // Expanded follow-up detection: vitals, numbers with units, short answers,
+                        // common clinical replies, and responses to AI questions
+                        const followUpPhrases = /^(yes|no|na|ok|okay|confirmed|negative|positive|normal|abnormal|clear|present|absent|the (results|test|scan|rdt|lab|x-ray|echo|ecg)|it shows|it is|it was|found|got|done|patient|and|also|moreover|he |she |they |i |his |her |we |bp |pulse|temp|spo2|rr |hr |pr |wt |weight|height|rbs|fbs|hb |urea|crea|gcs|avpu|rdt|fbc|cbc|esr|urinalysis|no instruments|no equipment|no thermometer|no bp|\d)/i;
 
-                        await sock.sendMessage(remoteJid, {
-                            text:
-                                `📋 *Case Check*\n\n` +
-                                `You have an active case open: *${activeCaseRef}*\n\n` +
-                                `Is this a continuation of the same case, or a *new patient case*?\n\n` +
-                                `Reply:\n` +
-                                `*1* — 🆕 New case (closes current)\n` +
-                                `*2* — 🔄 Same case (continue)`
-                        });
-                        return;
+                        // Match vital-sign value patterns: "120/80", "37.5", "102 b/m", "98%", "36.8 C", etc.
+                        const looksLikeVitalSign = /^\d{1,3}(\/\d{1,3}|\.\d{1,2}|\s*(b\/m|bpm|mmhg|mm\/hg|mg|kg|cm|%|c|f|celsius|fahrenheit|degrees|litres|mmol|mg\/dl|g\/dl|beats))/i.test(cleanText.trim());
+
+                        const looksLikeNewCase = cleanText.length > 40 && !followUpPhrases.test(cleanText.trim()) && !looksLikeVitalSign;
+
+                        if (looksLikeNewCase) {
+                            // Ask user before proceeding
+                            pendingNewCaseConfirm[remoteJid] = {
+                                pendingText: cleanText,
+                                existingCaseId: activeCaseId,
+                                existingCaseRef: activeCaseRef,
+                                askedAt: Date.now()
+                            };
+
+                            await sock.sendMessage(remoteJid, {
+                                text:
+                                    `You have case *${activeCaseRef}* open.\n\n` +
+                                    `Is this the same case or a new patient?\n\n` +
+                                    `*1* — 🆕 New patient\n` +
+                                    `*2* — 🔄 Same case`
+                            });
+                            return;
+                        }
                     }
                 }
 
@@ -739,7 +760,7 @@ async function dispatchClinicalQuery(remoteJid, user, queryText, activeCaseId, a
         } else if (apiRes.data.response) {
             // Send chunked response; prepend case reference for context
             const responseText = activeCaseRef
-                ? `📁 *Case ${activeCaseRef}*\n\n${apiRes.data.response}`
+                ? `*${activeCaseRef}*\n\n${apiRes.data.response}`
                 : apiRes.data.response;
             await sendChunked(remoteJid, responseText, sock);
         }
